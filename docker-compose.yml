@@ -1,22 +1,6 @@
-# JMSURF HMIS — production stack (Coolify: "Docker Compose" build pack, point at this file)
+# JMSURF HMIS — production stack (Coolify: "Docker Compose" build pack, point at this file).
+# The database is a separate Coolify Postgres (hmis-db); the app joins the coolify network to reach it.
 services:
-  postgres:
-    image: postgres:16-alpine
-    # Fixed name so the UK DR replica, bridge and pg_hba guard can find it across deploys.
-    container_name: hmis-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-jmsurf}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-jmsurf_hmis}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jmsurf} -d ${POSTGRES_DB:-jmsurf_hmis}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -28,12 +12,10 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-jmsurf}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jmsurf_hmis}?schema=public
+      # Coolify standalone Postgres "hmis-db" (replicated to the UK DR server); set in Coolify env.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
@@ -98,5 +80,4 @@ services:
       - "4100"
 
 volumes:
-  pgdata:
   redisdata:
