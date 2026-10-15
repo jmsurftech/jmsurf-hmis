@@ -1,0 +1,22 @@
+{
+  "_notice": "SAMPLE DATA ONLY. Codes, tariffs, facility levels and limits below are illustrative placeholders for development and demos. They are NOT the official SHA benefit package/tariff schedule. Load the official schedule from SHA/HIE before going live.",
+  "version": "SAMPLE-2026.1",
+  "packages": [
+    { "fund": "PHC", "code": "SAMPLE-PHC-OPD-001", "name": "Primary care outpatient consultation (Level 2-4)", "tariffMinor": 0, "minFacilityLevel": 2, "requiresPreauth": false, "frequencyLimit": "2/week" },
+    { "fund": "PHC", "code": "SAMPLE-PHC-LAB-001", "name": "Basic laboratory panel (PHC)", "tariffMinor": 0, "minFacilityLevel": 2, "requiresPreauth": false, "frequencyLimit": "4/month" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-OPD-001", "name": "Specialist outpatient consultation", "tariffMinor": 150000, "minFacilityLevel": 4, "requiresPreauth": false, "frequencyLimit": "4/month" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-IPD-001", "name": "Inpatient bed day (general ward)", "tariffMinor": 330000, "minFacilityLevel": 4, "requiresPreauth": false, "frequencyLimit": "180/year" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-IPD-002", "name": "ICU bed day", "tariffMinor": 2400000, "minFacilityLevel": 5, "requiresPreauth": true, "frequencyLimit": null },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-MAT-001", "name": "Normal delivery", "tariffMinor": 1000000, "minFacilityLevel": 3, "requiresPreauth": false, "frequencyLimit": "1/year" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-MAT-002", "name": "Caesarean section", "tariffMinor": 3000000, "minFacilityLevel": 4, "requiresPreauth": false, "frequencyLimit": "1/year" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-REN-001", "name": "Haemodialysis session", "tariffMinor": 1050000, "minFacilityLevel": 4, "requiresPreauth": true, "frequencyLimit": "3/week" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-ONC-001", "name": "Chemotherapy cycle", "tariffMinor": 2500000, "minFacilityLevel": 5, "requiresPreauth": true, "frequencyLimit": "1/week" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-IMG-001", "name": "CT scan", "tariffMinor": 900000, "minFacilityLevel": 4, "requiresPreauth": true, "frequencyLimit": "2/month" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-IMG-002", "name": "MRI scan", "tariffMinor": 1500000, "minFacilityLevel": 5, "requiresPreauth": true, "frequencyLimit": "1/month" },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-SUR-001", "name": "Minor surgical procedure", "tariffMinor": 800000, "minFacilityLevel": 3, "requiresPreauth": false, "frequencyLimit": null },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-SUR-002", "name": "Major surgical procedure", "tariffMinor": 6000000, "minFacilityLevel": 5, "requiresPreauth": true, "frequencyLimit": null },
+    { "fund": "SHIF", "code": "SAMPLE-SHIF-MH-001", "name": "Mental health inpatient day", "tariffMinor": 280000, "minFacilityLevel": 4, "requiresPreauth": false, "frequencyLimit": "90/year" },
+    { "fund": "ECCIF", "code": "SAMPLE-ECCIF-EMR-001", "name": "Emergency stabilisation (first 24h)", "tariffMinor": 1200000, "minFacilityLevel": 3, "requiresPreauth": false, "frequencyLimit": null },
+    { "fund": "ECCIF", "code": "SAMPLE-ECCIF-CCU-001", "name": "Critical illness care day", "tariffMinor": 2400000, "minFacilityLevel": 5, "requiresPreauth": true, "frequencyLimit": null }
+  ]
+}
