@@ -1,0 +1,91 @@
+# JMSURF HMIS — production stack (Coolify: "Docker Compose" build pack, point at this file)
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jmsurf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-jmsurf_hmis}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jmsurf} -d ${POSTGRES_DB:-jmsurf_hmis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jmsurf}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jmsurf_hmis}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      API_PORT: 4000
+      WEB_ORIGIN: ${WEB_ORIGIN:-*}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      SHA_BASE_URL: ${SHA_BASE_URL:-http://mock-servers:4100/sha}
+      SHA_CLIENT_ID: ${SHA_CLIENT_ID:-demo}
+      SHA_CLIENT_SECRET: ${SHA_CLIENT_SECRET:-demo}
+      MPESA_BASE_URL: ${MPESA_BASE_URL:-http://mock-servers:4100/mpesa}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-demo}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-demo}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-174379}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-demo}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL:-http://api:4000/api/payments/mpesa/callback}
+      ETIMS_BASE_URL: ${ETIMS_BASE_URL:-http://mock-servers:4100/etims}
+      ETIMS_PIN: ${ETIMS_PIN:-P000000000A}
+      ETIMS_BRANCH_ID: ${ETIMS_BRANCH_ID:-00}
+      ETIMS_DEVICE_SERIAL: ${ETIMS_DEVICE_SERIAL:-demo}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+      AFRICASTALKING_USERNAME: ${AFRICASTALKING_USERNAME:-sandbox}
+      AFRICASTALKING_API_KEY: ${AFRICASTALKING_API_KEY:-}
+      DHIS2_BASE_URL: ${DHIS2_BASE_URL:-http://mock-servers:4100/dhis2}
+      DHIS2_USERNAME: ${DHIS2_USERNAME:-admin}
+      DHIS2_PASSWORD: ${DHIS2_PASSWORD:-district}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    expose:
+      - "4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set NEXT_PUBLIC_API_URL e.g. https://api.yourdomain.com/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    expose:
+      - "3000"
+
+  mock-servers:
+    build:
+      context: .
+      dockerfile: apps/mock-servers/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 4100
+    expose:
+      - "4100"
+
+volumes:
+  pgdata:
+  redisdata:

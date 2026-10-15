@@ -2,7 +2,8 @@
 // Conventions: every tenant-owned row has tenantId; money is integer minor units (cents) + currency.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
 }
 
 datasource db {
