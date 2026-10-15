@@ -42,7 +42,7 @@ export class DialysisService {
 
   list(tenantId: string, q: SessionQuery) {
     const where: Prisma.DialysisSessionWhereInput = {
-      tenantId, ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.chair ? { chair: q.chair } : {}), ...(q.status ? { status: q.status } : {}),
+      tenantId, ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.chair ? { chair: q.chair } : {}), ...(q.status ? { status: { in: q.status.split(',') } } : {}),
       ...(q.from || q.to ? { scheduledAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
     };
     return this.prisma.dialysisSession.findMany({ where, orderBy: { scheduledAt: 'asc' }, take: 500 });

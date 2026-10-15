@@ -27,7 +27,7 @@ export class MaternityService {
   }
 
   list(tenantId: string, q: PregnancyQuery) {
-    return this.prisma.pregnancy.findMany({ where: { tenantId, ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.status ? { status: q.status } : {}) }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return this.prisma.pregnancy.findMany({ where: { tenantId, ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.status ? { status: { in: q.status.split(',') } } : {}) }, orderBy: { createdAt: 'desc' }, take: 200 });
   }
 
   async get(tenantId: string, id: string) {

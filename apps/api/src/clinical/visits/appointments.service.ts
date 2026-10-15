@@ -55,7 +55,7 @@ export class AppointmentsService {
       ...(q.practitionerId ? { practitionerId: q.practitionerId } : {}),
       ...(q.departmentId ? { departmentId: q.departmentId } : {}),
       ...(q.facilityId ? { facilityId: q.facilityId } : {}),
-      ...(q.status ? { status: q.status } : {}),
+      ...(q.status ? { status: { in: q.status.split(',') } } : {}),
     };
     const appts = await this.prisma.appointment.findMany({ where, orderBy: { startAt: 'asc' } });
     const patients = await this.prisma.patient.findMany({ where: { id: { in: [...new Set(appts.map((a) => a.patientId))] } }, select: { id: true, mrn: true, firstName: true, lastName: true, phone: true } });

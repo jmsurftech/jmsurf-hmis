@@ -17,7 +17,7 @@ export default function Pharmacy() {
     <div>
       <PageHeader title="Pharmacy" />
       <Tabs value={tab} onChange={setTab} tabs={[{ id: 'queue', label: 'Prescription queue' }, { id: 'dispensed', label: 'Dispensed' }, { id: 'pos', label: 'OTC point of sale' }]} />
-      {tab !== 'pos' && <DataTable path="/pharmacy/prescriptions" query={{ status: tab === 'queue' ? 'PENDING' : 'DISPENSED' }} onRowClick={setSel} columns={[
+      {tab !== 'pos' && <DataTable path="/pharmacy/prescriptions" query={{ status: tab === 'queue' ? 'PENDING,PARTIAL' : 'DISPENSED' }} onRowClick={setSel} columns={[
         { key: 'visit', header: 'Visit', render: (r: any) => r.visit?.visitNumber }, { key: 'patient', header: 'Patient', render: (r: any) => <span>{fullName(r.visit?.patient)}<span className="block text-xs text-slate-500">{r.visit?.patient?.mrn}</span></span> },
         { key: 'drugName', header: 'Drug' }, { key: 'sig', header: 'Sig', render: (r: any) => `${r.dose} ${r.route ?? ''} ${r.frequency}${r.durationDays ? ` × ${r.durationDays}d` : ''}` },
         { key: 'quantity', header: 'Qty', render: (r: any) => `${(r.dispenses ?? []).reduce((a: number, d: any) => a + d.quantity, 0)} / ${r.quantity}` },

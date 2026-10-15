@@ -59,7 +59,7 @@ export class PharmacyService {
 
   list(tenantId: string, q: RxQueryDto) {
     const where: Prisma.PrescriptionWhereInput = {
-      tenantId, ...(q.visitId ? { visitId: q.visitId } : {}), ...(q.status ? { status: q.status } : {}),
+      tenantId, ...(q.visitId ? { visitId: q.visitId } : {}), ...(q.status ? { status: { in: q.status.split(',') } } : {}),
       ...(q.q ? { OR: [{ drugName: { contains: q.q, mode: 'insensitive' } }, { visit: { patient: { mrn: { contains: q.q, mode: 'insensitive' } } } }] } : {}),
     };
     return paginate(q, (skip, take) => this.prisma.prescription.findMany({

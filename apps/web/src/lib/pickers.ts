@@ -16,7 +16,7 @@ export const PICK = {
   payer: { path: '/payers', sub: (p: any) => p.type },
   stockItem: { path: '/inventory/items', sub: (i: any) => [i.code, i.unit].filter(Boolean).join(' · ') },
   serviceItem: (category?: string): PickerSource => ({ path: '/pricing/service-items', query: category ? { category } : undefined, sub: (s: any) => [s.code, s.category].filter(Boolean).join(' · ') }),
-  practitioner: { path: '/admin/practitioners', label: (p: any) => p.user ? fullName(p.user) : p.name ?? fullName(p), sub: (p: any) => [p.cadre, p.licenseNumber].filter(Boolean).join(' · ') },
+  practitioner: { path: '/admin/practitioners', idOf: (p: any) => p.userId ?? p.id, label: (p: any) => p.user ? fullName(p.user) : p.name ?? fullName(p), sub: (p: any) => [p.cadre, p.licenseNumber].filter(Boolean).join(' · ') },
   employee: { path: '/hr/employees', label: (e: any) => fullName(e), sub: (e: any) => e.staffNo },
   department: { path: '/admin/departments' },
   facility: { path: '/admin/facilities' },

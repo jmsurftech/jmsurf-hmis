@@ -26,7 +26,7 @@ export class HomecareService {
     const isProviderOnly = !user.roles.some((r) => ['ADMIN', 'MANAGER', 'RECEPTION', 'ACCOUNTANT'].includes(r)) && !user.isSuperAdmin;
     const where: Prisma.HomeCareVisitWhereInput = {
       tenantId: user.tenantId, ...(isProviderOnly ? { providerId: user.sub } : q.providerId ? { providerId: q.providerId } : {}),
-      ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.status ? { status: q.status } : {}),
+      ...(q.patientId ? { patientId: q.patientId } : {}), ...(q.status ? { status: { in: q.status.split(',') } } : {}),
       ...(q.from || q.to ? { scheduledAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
     };
     return this.prisma.homeCareVisit.findMany({ where, orderBy: { scheduledAt: 'asc' }, take: 500 });

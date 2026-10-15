@@ -43,7 +43,7 @@ export function EntityPicker({ source, value, onChange, placeholder = 'Search…
     // preventDefault stops an enclosing <label> (Field) from re-dispatching clicks to the toggle button.
     <div ref={ref} className={cn('relative', className)} onClick={(e) => e.preventDefault()}>
       <button type="button" id={id} disabled={disabled} className="input flex items-center justify-between gap-2 text-left" onClick={() => setOpen(!open)} aria-haspopup="listbox">
-        <span className={cn('truncate', !value && 'text-slate-400')}>{value ? (selected ? label(selected) : 'Loading…') : placeholder}</span>
+        <span className={cn('truncate', !value && 'text-slate-400')}>{value ? (selected ? label(selected) : isFetching ? 'Loading…' : 'Selected') : placeholder}</span>
         <span className="flex items-center gap-1">
           {value && !disabled && <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-700" onClick={(e) => { e.stopPropagation(); setSelected(null); onChange(''); }} />}
           <ChevronDown className="h-4 w-4 text-slate-400" />

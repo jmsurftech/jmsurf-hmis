@@ -69,7 +69,7 @@ export class QueueService {
     const tickets = await this.prisma.queueTicket.findMany({
       where: { tenantId: user.tenantId, facilityId, ...(q.servicePoint ? { servicePoint: q.servicePoint } : {}), OR: [{ status: { in: ['WAITING', 'CALLED', 'SERVING'] } }, { status: 'DONE', doneAt: { gte: startOfDay() } }] },
       orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
-      include: { visit: { select: { visitNumber: true, patient: { select: { firstName: true, lastName: true, mrn: true } } } } },
+      include: { visit: { select: { visitNumber: true, patient: { select: { id: true, firstName: true, lastName: true, mrn: true } } } } },
     });
     const now = Date.now();
     const byPoint: Record<string, { waiting: any[]; called: any[]; serving: any[]; doneToday: number; avgWaitMins: number | null }> = {};
