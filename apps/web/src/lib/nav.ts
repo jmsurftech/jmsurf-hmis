@@ -56,6 +56,7 @@ const BASE: NavGroup[] = [
     { href: '/admin/prices', label: 'Price lists', icon: Tags, roles: ['ADMIN'] },
     { href: '/admin/payers', label: 'Payers & schemes', icon: Handshake, roles: ['ADMIN'] },
     { href: '/admin/audit', label: 'Audit log', icon: History, roles: ['ADMIN'] },
+    { href: '/admin/subscription', label: 'Subscription', icon: CreditCard, roles: ['ADMIN', 'ACCOUNTANT'] },
   ] },
 ];
 /** Sidebar order: core clinical first, then the register-based modules, then revenue and back office. */

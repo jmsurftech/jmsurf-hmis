@@ -173,4 +173,20 @@ app.post('/sms', sms);
 app.post('/sms/version1/messaging', sms);
 
 const port = Number(process.env.PORT ?? 4100);
+
+// ---- JMSURF PAY (subscription STK for the SaaS platform). A prompt completes after ~6 s; amounts ending in 13 fail.
+const payTx = new Map<string, { at: number; amount: number }>();
+app.post('/jmsurfpay/api/payments/stkpush', (req, res) => {
+  if (!req.header('X-API-Key')) return res.status(401).json({ message: 'Missing API key' });
+  const id = 'ws_CO_MOCK' + Date.now(); payTx.set(id, { at: Date.now(), amount: Number(req.body?.amount) });
+  res.json({ success: true, checkoutRequestId: id, message: 'Prompt sent' });
+});
+app.get('/jmsurfpay/api/payments/status/:id', (req, res) => {
+  const t = payTx.get(req.params.id);
+  if (!t) return res.status(404).json({ message: 'Unknown checkout' });
+  if (Date.now() - t.at < 6000) return res.json({ status: 'pending' });
+  if (String(t.amount).endsWith('13')) return res.json({ status: 'failed', resultDesc: 'Request cancelled by user' });
+  res.json({ status: 'completed', mpesaReceiptNumber: 'MOCK' + String(t.at).slice(-6) });
+});
+
 app.listen(port, () => console.log(`[mock] JMSURF mock servers listening on :${port}`));

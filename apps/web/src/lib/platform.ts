@@ -1,4 +1,4 @@
-import { Building2, History, LayoutDashboard, Stethoscope } from 'lucide-react';
+import { Building2, History, LayoutDashboard, Receipt, Stethoscope } from 'lucide-react';
 import type { NavGroup } from './nav';
 
 /** Sidebar of the JMSURF platform console (super admins only). */
@@ -6,6 +6,7 @@ export const PLATFORM_NAV: NavGroup[] = [
   { label: 'Platform', items: [
     { href: '/platform', label: 'Overview', short: 'Overview', icon: LayoutDashboard },
     { href: '/platform/tenants', label: 'Tenants', icon: Building2 },
+    { href: '/platform/billing', label: 'Billing and pricing', short: 'Billing', icon: Receipt },
     { href: '/platform/audit', label: 'Platform audit', short: 'Audit', icon: History },
   ] },
   { label: 'My facility', items: [{ href: '/dashboard', label: 'Back to the hospital app', short: 'App', icon: Stethoscope }] },

@@ -1,6 +1,6 @@
 import {
   BadRequestException, Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Get, Injectable, Logger, Module, NotFoundException,
-  OnApplicationBootstrap, Param, Patch, Query, UseGuards,
+  OnApplicationBootstrap, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, Min } from 'class-validator';
@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CurrentUser } from '../common/auth-user';
 import { ListQuery, pageArgs, paged } from '../revenue/list-query';
+import { DemoResetService } from './demo-reset.service';
 
 const STATUSES = ['TRIAL', 'ACTIVE', 'GRACE', 'READ_ONLY', 'CANCELLED'] as const;
 const PLANS = ['CLINIC', 'HOSPITAL', 'ENTERPRISE'] as const;
@@ -27,6 +28,8 @@ class UpdateTenantDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365) extendTrialDays?: number;
   @IsOptional() @IsBoolean() suspended?: boolean;
   @IsOptional() @IsString() reason?: string;
+  /** true: the hourly billing job leaves this tenant alone (set automatically when a super admin picks a status). */
+  @IsOptional() @IsBoolean() billingManual?: boolean;
 }
 
 /** Super-admin only. Checks the database, not the token, so a revoked flag takes effect at once. */
@@ -139,6 +142,8 @@ export class PlatformService implements OnApplicationBootstrap {
     const data: any = {};
     if (dto.plan) data.plan = dto.plan;
     if (dto.subscriptionStatus) data.subscriptionStatus = dto.subscriptionStatus;
+    const manual = dto.billingManual ?? (dto.subscriptionStatus ? true : undefined);
+    if (manual !== undefined) data.settings = { ...((t.settings as any) ?? {}), billingManual: manual };
     if (dto.trialEndsAt) data.trialEndsAt = new Date(dto.trialEndsAt);
     if (dto.extendTrialDays) {
       const base = t.trialEndsAt && t.trialEndsAt > new Date() ? t.trialEndsAt : new Date();
@@ -201,7 +206,7 @@ export class TenantStatusGuard implements CanActivate {
     const s = await TenantStatusCache.get(this.prisma, u.tenantId);
     if (s.suspended) throw new ForbiddenException('This facility account is suspended. Contact JMSURF support.');
     const write = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-    const allowed = /^\/api\/(auth|platform)\//.test(req.path ?? req.url ?? '');
+    const allowed = /^\/api\/(auth|platform|subscription)(\/|$)/.test(req.path ?? req.url ?? '');
     if (write && !allowed && ['READ_ONLY', 'CANCELLED'].includes(s.status)) throw new ForbiddenException('The subscription has lapsed, so the system is read-only. Renew to continue.');
     return true;
   }
@@ -210,7 +215,9 @@ export class TenantStatusGuard implements CanActivate {
 @Controller('platform')
 @UseGuards(SuperAdminGuard)
 export class PlatformController {
-  constructor(private svc: PlatformService) {}
+  constructor(private svc: PlatformService, private demo: DemoResetService) {}
+  /** Wipe the public demo tenant and load the seed again (also runs nightly). */
+  @Post('demo/reset') demoReset() { return this.demo.reset(); }
   @Get('overview') overview() { return this.svc.overview(); }
   @Get('tenants') tenants(@Query() q: TenantListQuery) { return this.svc.tenants(q); }
   @Get('tenants/:id') tenant(@Param('id') id: string) { return this.svc.tenant(id); }
@@ -218,5 +225,5 @@ export class PlatformController {
   @Get('audit') audit(@Query() q: PlatformAuditQuery) { return this.svc.auditLog(q); }
 }
 
-@Module({ controllers: [PlatformController], providers: [PlatformService, SuperAdminGuard, TenantStatusGuard], exports: [TenantStatusGuard] })
+@Module({ controllers: [PlatformController], providers: [PlatformService, SuperAdminGuard, TenantStatusGuard, DemoResetService], exports: [TenantStatusGuard] })
 export class PlatformModule {}

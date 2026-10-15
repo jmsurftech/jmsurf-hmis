@@ -18,7 +18,7 @@ case "$1" in
     docker run -d --name hmis-api --network $NET -v $T:/repo -v $C:/pnpm-store -w /repo \
       -e DATABASE_URL="postgresql://jmsurf:testpass@hmis-pg:5432/jmsurf_hmis?schema=public" -e JWT_SECRET=test-secret-test-secret -e API_PORT=4000 \
       -e SHA_BASE_URL=http://hmis-mock:4100/sha -e MPESA_BASE_URL=http://hmis-mock:4100/mpesa -e ETIMS_BASE_URL=http://hmis-mock:4100/etims \
-      -e DHIS2_BASE_URL=http://hmis-mock:4100/dhis2 -e AFRICASTALKING_BASE_URL=http://hmis-mock:4100/sms -e SMS_PROVIDER=mock \
+      -e DHIS2_BASE_URL=http://hmis-mock:4100/dhis2 -e AFRICASTALKING_BASE_URL=http://hmis-mock:4100/sms -e SMS_PROVIDER=mock -e JMSURFPAY_URL=http://hmis-mock:4100/jmsurfpay -e JMSURFPAY_API_KEY=test-key \
       node:22-alpine sh -c 'apk add --no-cache openssl >/dev/null; corepack enable; pnpm config set store-dir /pnpm-store >/dev/null; pnpm install --filter @jmsurf-hmis/api... --frozen-lockfile=false >/tmp/i.log 2>&1;
         cd apps/api && npx prisma generate >/dev/null && npx prisma migrate deploy && (test -f /repo/.seeded || (npx ts-node prisma/seed.ts && touch /repo/.seeded)); pnpm build >/tmp/b.log 2>&1 || { cat /tmp/b.log; exit 1; }; node dist/main.js' >/dev/null ;;
   web)

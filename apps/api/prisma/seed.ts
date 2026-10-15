@@ -354,12 +354,12 @@ async function main() {
   // ── Tenant & facility
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },
-    update: { name: 'JMSURF HMIS Demo Hospital', settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012' } },
+    update: { name: 'JMSURF HMIS Demo Hospital', settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012', billingManual: true }, subscriptionStatus: 'ACTIVE' },
     create: {
       name: 'JMSURF HMIS Demo Hospital', slug: 'demo', countryCode: 'KE', currency: 'KES', plan: 'HOSPITAL', subscriptionStatus: 'ACTIVE',
       primaryColor: '#0f766e', kraPin: 'P051234567X',
       enabledModules: ['patients', 'opd', 'triage', 'lab', 'radiology', 'pharmacy', 'ipd', 'maternity', 'theatre', 'dialysis', 'billing', 'claims', 'inventory', 'procurement', 'finance', 'hr', 'assets', 'reports', 'telemedicine', 'homecare', 'quality'],
-      settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012' },
+      settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012', billingManual: true },
     },
   });
   const T = tenant.id;

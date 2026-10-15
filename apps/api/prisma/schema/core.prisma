@@ -43,6 +43,7 @@ model Tenant {
   settings           Json               @default("{}")
   enabledModules     String[]           @default([])
   suspendedAt        DateTime?
+  paidUntil          DateTime?
   suspendReason      String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -1195,4 +1196,40 @@ model PortalAccount {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// ───────────────────────────── SaaS subscription billing ─────────────────────────────
+
+/// Platform invoice to a tenant (subscription months or per-visit usage). Paid by M-Pesa STK through JMSURF PAY or recorded by a super admin.
+model SubscriptionInvoice {
+  id                String    @id @default(uuid())
+  tenantId          String
+  number            String    @unique
+  kind              String    @default("SUBSCRIPTION") // SUBSCRIPTION, USAGE
+  plan              String
+  months            Int       @default(1)
+  visits            Int?
+  periodStart       DateTime
+  periodEnd         DateTime
+  amountMinor       Int
+  currency          String    @default("KES")
+  status            String    @default("OPEN") // OPEN, PENDING, PAID, VOID
+  dueAt             DateTime
+  paidAt            DateTime?
+  method            String? // MPESA, BANK, WAIVER
+  reference         String?
+  checkoutRequestId String?
+  phone             String?
+  failure           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId, status])
+}
+
+/// Platform-wide settings edited from the console, e.g. key "pricing".
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }

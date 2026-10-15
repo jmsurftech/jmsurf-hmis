@@ -1,5 +1,5 @@
 'use client';
-import { Bell, ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Moon, RefreshCw, Search, Settings, ShieldCheck, Sun, UserCircle2, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Moon, RefreshCw, CreditCard, Search, Settings, ShieldCheck, Sun, UserCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +25,7 @@ export function PoweredBy({ className }: { className?: string }) {
 }
 
 const BUBBLES: [number, number, number, number][] = [[-4, 8, 220, 0], [86, -6, 260, 3], [70, 62, 180, 6], [8, 74, 140, 9], [42, 88, 110, 4], [94, 40, 90, 11]];
-const isActive = (path: string, href: string) => (href === '/admin' ? path === '/admin' : path === href || path.startsWith(href + '/'));
+const isActive = (path: string, href: string) => (href === '/admin' || href === '/platform' ? path === href : path === href || path.startsWith(href + '/'));
 function readClosed(): Record<string, boolean> { try { return JSON.parse(localStorage.getItem('hmis.nav.closed') || '{}'); } catch { return {}; } }
 
 function FacilitySwitcher() {
@@ -93,6 +93,19 @@ function Notifications() {
 }
 
 /** Staff shell. The platform console passes its own nav, home link, bottom bar and subtitle. */
+/** Trial ending, payment due or read-only: one line above every page, with a link for those who can pay. */
+function SubscriptionBanner() {
+  const { user, hasRole } = useAuth();
+  const { data: s } = useGet<any>(user?.tenantId ? '/subscription' : null);
+  if (!s || s.managed) return null;
+  const d = s.daysLeft ?? 0;
+  const msg = s.status === 'READ_ONLY' ? 'The subscription has lapsed, so the system is read-only. Pay to restore full access.'
+    : s.status === 'GRACE' ? `Payment is due. The system becomes read-only on ${new Date(s.readOnlyAt ?? Date.now()).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}.`
+    : s.status === 'TRIAL' && d <= 7 ? `Your free trial ends in ${Math.max(d, 0)} day${d === 1 ? '' : 's'}. Choose a plan to keep going.` : null;
+  if (!msg) return null;
+  return <div className={cn('alert mb-4 no-print', s.status === 'TRIAL' ? 'info' : s.status === 'GRACE' ? 'warn' : 'bad')}><CreditCard /><span className="flex-1">{msg}</span>{hasRole('ADMIN', 'ACCOUNTANT') && <Link href="/admin/subscription" className="btn sm">Open subscription</Link>}</div>;
+}
+
 export function AppShell({ children, nav = NAV, home = '/dashboard', bottomNav = BOTTOM, sub }: { children: React.ReactNode; nav?: NavGroup[]; home?: string; bottomNav?: string[]; sub?: string }) {
   const { user, loading, hasRole } = useAuth();
   const router = useRouter(); const path = usePathname();
@@ -157,7 +170,7 @@ export function AppShell({ children, nav = NAV, home = '/dashboard', bottomNav =
           <Notifications />
           <UserMenu />
         </header>
-        <main className="content" ref={contentRef}><div className="page" key={`${path}-${refresh}`}>{children}</div></main>
+        <main className="content" ref={contentRef}>{!path.startsWith('/platform') && <SubscriptionBanner />}<div className="page" key={`${path}-${refresh}`}>{children}</div></main>
       </div>
       <nav className="notch-nav lg-hide no-print" aria-label="Main">
         {bottom.map((i) => <Link key={i.href} href={i.href} className={cn('notch-item', isActive(path, i.href) && 'is-active')}><span className="notch-ico"><i.icon /></span><span>{i.short ?? i.label}</span></Link>)}

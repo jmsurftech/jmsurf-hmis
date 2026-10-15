@@ -14,6 +14,7 @@ import { RevenueModule } from './revenue/revenue.module';
 import { BackOfficeModule } from './backoffice/backoffice.module';
 import { PlatformModule, TenantStatusGuard } from './platform/platform.module';
 import { PortalModule } from './portal/portal.module';
+import { SubscriptionModule } from './platform/subscription.module';
 
 @Controller('health')
 class HealthController {
@@ -29,7 +30,7 @@ class HealthController {
   imports: [
     ScheduleModule.forRoot(),
     PrismaModule, SequenceModule, AuditModule, MailModule, BillingCoreModule, AuthModule,
-    RevenueModule, ClinicalModule, BackOfficeModule, PlatformModule, PortalModule,
+    RevenueModule, ClinicalModule, BackOfficeModule, PlatformModule, PortalModule, SubscriptionModule,
   ],
   controllers: [HealthController],
   providers: [
