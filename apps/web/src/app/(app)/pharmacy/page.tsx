@@ -1,25 +1,33 @@
 'use client';
-import { Barcode, Minus, Plus, Trash2 } from 'lucide-react';
+import { Barcode, CheckCircle2, ClipboardList, Minus, Pill, Plus, ShoppingCart, Smartphone, Banknote, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { DataTable } from '@/components/DataTable';
 import { MpesaStk } from '@/components/MpesaStk';
-import { Card, Field, Modal, PageHeader, Spinner, StatusBadge, Tabs } from '@/components/ui';
+import { Card, EmptyState, Field, Modal, PageHeader, Spinner, StatCard, StatusBadge, Tabs } from '@/components/ui';
 import { EntityPicker } from '@/components/EntityPicker';
 import { PICK } from '@/lib/pickers';
 import { useToast } from '@/components/Toast';
 import { api } from '@/lib/api';
-import { useAction } from '@/lib/hooks';
+import { useAction, useList } from '@/lib/hooks';
 import { dateTime, fullName, money } from '@/lib/format';
 
 export default function Pharmacy() {
   const [tab, setTab] = useState('queue'); const [sel, setSel] = useState<any>(null);
+  const queue = useList('/pharmacy/prescriptions', { status: 'PENDING,PARTIAL', pageSize: 1 });
+  const dispensed = useList('/pharmacy/prescriptions', { status: 'DISPENSED', pageSize: 1 });
   return (
     <div>
-      <PageHeader title="Pharmacy" />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'queue', label: 'Prescription queue' }, { id: 'dispensed', label: 'Dispensed' }, { id: 'pos', label: 'OTC point of sale' }]} />
-      {tab !== 'pos' && <DataTable path="/pharmacy/prescriptions" query={{ status: tab === 'queue' ? 'PENDING,PARTIAL' : 'DISPENSED' }} onRowClick={setSel} columns={[
+      <PageHeader title="Pharmacy" subtitle="Dispense prescriptions from the clinics and sell over the counter. Stock is deducted by batch, first to expire first."
+        actions={<button className="btn primary" onClick={() => setTab('pos')}><ShoppingCart />Over-the-counter sale</button>} />
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <StatCard label="Waiting to dispense" value={queue.data?.total} icon={ClipboardList} tone="amber" loading={queue.isLoading} />
+        <StatCard label="Dispensed (all time)" value={dispensed.data?.total} icon={CheckCircle2} tone="green" loading={dispensed.isLoading} />
+        <div className="col-span-2 lg:col-span-1"><StatCard label="Counter" value={tab === 'pos' ? 'Selling' : 'Ready'} hint="Scan a barcode to start a sale" icon={Pill} tone="teal" /></div>
+      </div>
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'queue', label: 'Prescription queue', icon: ClipboardList, count: queue.data?.total }, { id: 'dispensed', label: 'Dispensed', icon: CheckCircle2 }, { id: 'pos', label: 'Over the counter', icon: ShoppingCart }]} />
+      {tab !== 'pos' && <DataTable path="/pharmacy/prescriptions" query={{ status: tab === 'queue' ? 'PENDING,PARTIAL' : 'DISPENSED' }} onRowClick={setSel} searchPlaceholder="Search patient or drug" emptyTitle={tab === 'queue' ? 'No prescriptions waiting' : 'Nothing dispensed yet'} columns={[
         { key: 'visit', header: 'Visit', render: (r: any) => r.visit?.visitNumber }, { key: 'patient', header: 'Patient', render: (r: any) => <span>{fullName(r.visit?.patient)}<span className="block text-xs text-slate-500">{r.visit?.patient?.mrn}</span></span> },
-        { key: 'drugName', header: 'Drug' }, { key: 'sig', header: 'Sig', render: (r: any) => `${r.dose} ${r.route ?? ''} ${r.frequency}${r.durationDays ? ` × ${r.durationDays}d` : ''}` },
+        { key: 'drugName', header: 'Drug', render: (r: any) => <span className="flex items-center gap-2"><Pill className="h-4 w-4 shrink-0 text-brand" /><b>{r.drugName}</b></span> }, { key: 'sig', header: 'Sig', render: (r: any) => `${r.dose} ${r.route ?? ''} ${r.frequency}${r.durationDays ? ` × ${r.durationDays}d` : ''}` },
         { key: 'quantity', header: 'Qty', render: (r: any) => `${(r.dispenses ?? []).reduce((a: number, d: any) => a + d.quantity, 0)} / ${r.quantity}` },
         { key: 'createdAt', header: 'Time', render: (r: any) => dateTime(r.createdAt) }, { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
       ]} />}
@@ -36,9 +44,9 @@ function DispenseDialog({ rx, onClose }: { rx: any; onClose: () => void }) {
   const m = useAction('post', `/pharmacy/prescriptions/${rx.id}/dispense`, { invalidate: ['/pharmacy'], success: 'Dispensed', onSuccess: (r: any) => setLabel(r?.label) });
   const open = ['PENDING', 'PARTIAL'].includes(rx.status) && !label;
   return (
-    <Modal open onClose={onClose} title={`Dispense: ${rx.drugName}`} footer={open ? <><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={m.isPending || qty < 1 || qty > remaining} onClick={() => m.mutate({ quantity: qty, storeId: storeId || undefined })}>{m.isPending && <Spinner />}Dispense & label</button></> : <button className="btn-secondary" onClick={onClose}>Close</button>}>
-      <p className="mb-3 text-sm">{fullName(rx.visit?.patient)} · {rx.visit?.patient?.mrn} · {rx.visit?.visitNumber}</p>
-      {label ? <div className="rounded-lg border border-dashed border-slate-300 p-3 font-mono text-xs dark:border-slate-700"><p className="font-bold">{label.drug}</p><p>{label.dose} {label.frequency}{label.durationDays ? ` for ${label.durationDays} days` : ''}</p><p>Qty {label.quantity}</p>{label.instructions && <p>{label.instructions}</p>}</div>
+    <Modal open onClose={onClose} title={`Dispense: ${rx.drugName}`} footer={open ? <><button className="btn" onClick={onClose}>Close</button><button className="btn primary" disabled={m.isPending || qty < 1 || qty > remaining} onClick={() => m.mutate({ quantity: qty, storeId: storeId || undefined })}>{m.isPending && <Spinner />}Dispense & label</button></> : <button className="btn" onClick={onClose}>Close</button>}>
+      <p className="m-0 mb-3 text-sm text-slate-500">{fullName(rx.visit?.patient)} · {rx.visit?.patient?.mrn} · {rx.visit?.visitNumber}</p>
+      {label ? <div className="rounded-2xl border border-dashed border-slate-300 p-4 font-mono text-xs dark:border-white/15"><div className="alert ok mb-3 font-sans"><CheckCircle2 />Dispensed. Print or copy the label below.</div><p className="font-bold">{label.drug}</p><p>{label.dose} {label.frequency}{label.durationDays ? ` for ${label.durationDays} days` : ''}</p><p>Qty {label.quantity}</p>{label.instructions && <p>{label.instructions}</p>}</div>
         : <div className="grid gap-3 sm:grid-cols-2">
           <p className="text-sm sm:col-span-2">{rx.dose} {rx.route} {rx.frequency}{rx.durationDays ? ` × ${rx.durationDays}d` : ''} · prescribed {rx.quantity}, remaining {remaining}</p>
           <Field label="Quantity"><input type="number" className="input" disabled={!open} value={qty} onChange={(e) => setQty(Number(e.target.value))} /></Field>
@@ -81,23 +89,23 @@ function Pos() {
   const reset = () => { setCart([]); setPay(''); setTendered(''); setBill(null); ref.current?.focus(); };
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <Card title="Cart" className="lg:col-span-2">
-        <form onSubmit={add} className="relative mb-3"><Barcode className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input ref={ref} autoFocus className="input pl-9" placeholder="Scan barcode or type item name, then Enter" value={code} onChange={(e) => setCode(e.target.value)} /></form>
-        {cart.length ? <table className="w-full text-sm"><tbody>{cart.map((l, i) => <tr key={l.itemId} className="border-t border-slate-100 dark:border-slate-800">
-          <td className="td">{l.name}</td><td className="td">{money(l.unitPriceMinor)}</td>
-          <td className="td"><span className="flex items-center gap-1"><button className="btn-secondary px-1.5 py-0.5" onClick={() => setCart(cart.map((x, j) => j === i ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x))}><Minus className="h-3 w-3" /></button><span className="w-6 text-center">{l.quantity}</span><button className="btn-secondary px-1.5 py-0.5" onClick={() => setCart(cart.map((x, j) => j === i ? { ...x, quantity: x.quantity + 1 } : x))}><Plus className="h-3 w-3" /></button></span></td>
-          <td className="td text-right font-medium">{money(l.unitPriceMinor * l.quantity)}</td><td className="td"><button onClick={() => setCart(cart.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-red-500" /></button></td></tr>)}</tbody></table>
-          : <p className="py-10 text-center text-sm text-slate-500">Scan an item to start a sale</p>}
+      <Card title="Cart" subtitle="Scan or type, then press Enter" className="lg:col-span-2" actions={cart.length > 0 && <span className="badge">{cart.reduce((a, l) => a + l.quantity, 0)} items</span>}>
+        <form onSubmit={add} className="mb-3"><span className="input-icon"><Barcode /><input ref={ref} autoFocus className="input" placeholder="Scan a barcode or type an item name" value={code} onChange={(e) => setCode(e.target.value)} /></span></form>
+        {cart.length ? <div className="tablewrap"><table className="t"><thead><tr><th>Item</th><th>Price</th><th>Qty</th><th className="text-right">Total</th><th /></tr></thead><tbody>{cart.map((l, i) => <tr key={l.itemId}>
+          <td><b>{l.name}</b></td><td>{money(l.unitPriceMinor)}</td>
+          <td><span className="flex items-center gap-1"><button className="btn xs icon" aria-label="Less" onClick={() => setCart(cart.map((x, j) => j === i ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x))}><Minus className="h-3 w-3" /></button><span className="w-7 text-center font-bold">{l.quantity}</span><button className="btn xs icon" aria-label="More" onClick={() => setCart(cart.map((x, j) => j === i ? { ...x, quantity: x.quantity + 1 } : x))}><Plus className="h-3 w-3" /></button></span></td>
+          <td className="text-right font-bold">{money(l.unitPriceMinor * l.quantity)}</td><td className="w-px"><button className="btn ghost xs icon" aria-label="Remove" onClick={() => setCart(cart.filter((_, j) => j !== i))}><Trash2 className="text-red-500" /></button></td></tr>)}</tbody></table></div>
+          : <EmptyState icon={ShoppingCart} title="The cart is empty" message="Scan an item to start a sale." />}
       </Card>
       <Card title="Payment">
-        <p className="text-sm text-slate-500">Total</p><p className="mb-4 text-3xl font-bold">{money(total)}</p>
-        <div className="mb-4 grid grid-cols-2 gap-2"><button className={pay === 'CASH' ? 'btn-primary' : 'btn-secondary'} onClick={() => setPay('CASH')} disabled={!cart.length}>Cash</button><button className={pay === 'MPESA' ? 'btn-primary' : 'btn-secondary'} onClick={() => setPay('MPESA')} disabled={!cart.length}>M-Pesa</button></div>
-        {pay === 'CASH' && <div className="space-y-3"><input className="input" type="number" placeholder="Amount tendered" value={tendered} onChange={(e) => setTendered(e.target.value)} />
+        <div className="hero-card mb-4 !p-5"><small className="muted block">Total to pay</small><b className="text-3xl font-extrabold">{money(total)}</b></div>
+        <div className="mb-4 grid grid-cols-2 gap-2"><button className={pay === 'CASH' ? 'btn primary' : 'btn'} onClick={() => setPay('CASH')} disabled={!cart.length}><Banknote />Cash</button><button className={pay === 'MPESA' ? 'btn mpesa' : 'btn'} onClick={() => setPay('MPESA')} disabled={!cart.length}><Smartphone />M-Pesa</button></div>
+        {pay === 'CASH' && <div className="space-y-3"><input className="input" type="number" placeholder="Enter amount tendered (KES)" value={tendered} onChange={(e) => setTendered(e.target.value)} />
           {Number(tendered) * 100 >= due && <p className="text-sm">Change: <b>{money(Number(tendered) * 100 - due)}</b></p>}
-          <button className="btn-primary w-full" disabled={busy || Number(tendered) * 100 < due} onClick={payCash}>{busy && <Spinner />}Complete sale</button></div>}
+          <button className="btn primary w-full" disabled={busy || Number(tendered) * 100 < due} onClick={payCash}>{busy && <Spinner />}Complete sale</button></div>}
         {pay === 'MPESA' && (bill ? <MpesaStk amountMinor={due} body={{ billId: bill.id }} onSuccess={() => { toast.push('Sale completed', 'success'); setTimeout(reset, 1500); }} />
-          : <button className="btn-primary w-full" disabled={busy} onClick={startMpesa}>{busy && <Spinner />}Create sale & request M-Pesa</button>)}
-        {cart.length > 0 && <button className="btn-secondary mt-3 w-full" onClick={reset}>Clear</button>}
+          : <button className="btn primary w-full" disabled={busy} onClick={startMpesa}>{busy && <Spinner />}Create sale & request M-Pesa</button>)}
+        {cart.length > 0 && <button className="btn mt-3 w-full" onClick={reset}>Clear</button>}
       </Card>
     </div>
   );

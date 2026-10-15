@@ -1,12 +1,12 @@
 'use client';
-import { Banknote, CreditCard, FileCheck2, Lock, Percent, Printer, Smartphone } from 'lucide-react';
+import { Banknote, CreditCard, FileCheck2, Lock, Percent, Printer, ReceiptText, ShieldCheck, Smartphone, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { use, useState } from 'react';
 import { Table } from '@/components/DataTable';
 import { FormDialog } from '@/components/FormDialog';
 import { MpesaStk } from '@/components/MpesaStk';
-import { Card, ErrorNote, KV, Loading, Modal, PageHeader, StatusBadge } from '@/components/ui';
+import { Card, ErrorNote, KV, Loading, Modal, PageHeader, StatCard, StatusBadge, humanize } from '@/components/ui';
 import { useAction, useGet } from '@/lib/hooks';
 import { dateTime, fullName, money } from '@/lib/format';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,16 +28,22 @@ export default function BillDetail({ params }: { params: Promise<{ id: string }>
   const editable = !['FINAL', 'PAID', 'VOID'].includes(b.status); const patient = b.visit?.patient;
   return (
     <div>
-      <PageHeader title={`Bill ${b.billNumber ?? ''}`} subtitle={`${fullName(patient)} · ${b.visit?.visitNumber ?? ''} · ${b.visit?.payerType ?? ''} · ${dateTime(b.createdAt)}`} actions={<>
-        {editable && <button className="btn-secondary" onClick={() => setDlg('discount')}><Percent className="h-4 w-4" />Discount</button>}
-        {editable && <button className="btn-secondary" disabled={finalize.isPending} onClick={() => finalize.mutate({ type: 'FINAL' })}><Lock className="h-4 w-4" />Finalise (eTIMS)</button>}
-        {b.payerAmountMinor > 0 && <button className="btn-secondary" disabled={claim.isPending} onClick={() => claim.mutate({ billId: id })}><FileCheck2 className="h-4 w-4" />Create claim</button>}
-        <button className="btn-secondary" onClick={() => setDlg('cash')} disabled={balance <= 0}><Banknote className="h-4 w-4" />Cash</button>
-        <button className="btn-secondary" onClick={() => setDlg('card')} disabled={balance <= 0}><CreditCard className="h-4 w-4" />Card</button>
-        <button className="btn-primary bg-emerald-600 hover:bg-emerald-700" onClick={() => setDlg('mpesa')} disabled={balance <= 0}><Smartphone className="h-4 w-4" />M-Pesa</button></>} />
-      {fiscalMsg && <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">{fiscalMsg}</div>}
+      <PageHeader eyebrow={<StatusBadge status={b.status} />} title={`Bill ${b.billNumber ?? ''}`} subtitle={`${fullName(patient)} · ${b.visit?.visitNumber ?? ''} · ${humanize(b.visit?.payerType ?? 'CASH')} · ${dateTime(b.createdAt)}`} actions={<>
+        {editable && <button className="btn" onClick={() => setDlg('discount')}><Percent className="h-4 w-4" />Discount</button>}
+        {editable && <button className="btn" disabled={finalize.isPending} onClick={() => finalize.mutate({ type: 'FINAL' })}><Lock className="h-4 w-4" />Finalise (eTIMS)</button>}
+        {b.payerAmountMinor > 0 && <button className="btn" disabled={claim.isPending} onClick={() => claim.mutate({ billId: id })}><FileCheck2 className="h-4 w-4" />Create claim</button>}
+        <button className="btn" onClick={() => setDlg('cash')} disabled={balance <= 0}><Banknote className="h-4 w-4" />Cash</button>
+        <button className="btn" onClick={() => setDlg('card')} disabled={balance <= 0}><CreditCard className="h-4 w-4" />Card</button>
+        <button className="btn mpesa" onClick={() => setDlg('mpesa')} disabled={balance <= 0}><Smartphone className="h-4 w-4" />M-Pesa</button></>} />
+      {fiscalMsg && <div className={`alert ${fiscalMsg.includes('failed') ? 'warn' : 'ok'} mb-4`}><FileCheck2 />{fiscalMsg}</div>}
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Bill total" value={money(b.totalMinor)} hint={b.discountMinor ? `Less ${money(b.discountMinor)} discount` : (() => { const n = (b.lines ?? []).filter((l: any) => !l.voided).length; return `${n} item${n === 1 ? '' : 's'}`; })()} icon={ReceiptText} />
+        <StatCard label="Covered by payer" value={money(b.payerAmountMinor)} hint={b.visit?.payerType ? humanize(b.visit.payerType) : undefined} icon={ShieldCheck} tone="blue" />
+        <StatCard label="Paid" value={money(b.paidMinor)} hint={(() => { const n = (b.payments ?? []).filter((p: any) => p.status === 'COMPLETED').length; return `${n} payment${n === 1 ? '' : 's'}`; })()} icon={Banknote} tone="green" />
+        <StatCard label="Balance" value={money(balance)} hint={balance ? 'Patient to pay' : 'Fully settled'} icon={Wallet} tone={balance ? 'amber' : 'green'} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Bill lines" className="lg:col-span-2">
+        <Card title="Bill lines" subtitle="Charges posted from every department for this visit" className="lg:col-span-2" flush>
           <Table rows={(b.lines ?? []).filter((l: any) => !l.voided)} columns={[
             { key: 'description', header: 'Item' }, { key: 'sourceType', header: 'Source' },
             { key: 'quantity', header: 'Qty', className: 'text-right' }, { key: 'unitPriceMinor', header: 'Price', render: (l: any) => money(l.unitPriceMinor), className: 'text-right' },
@@ -49,12 +55,12 @@ export default function BillDetail({ params }: { params: Promise<{ id: string }>
           <Card title="Summary">
             <dl className="space-y-2 text-sm">
               {[['Total', b.totalMinor], ['Discounts', -(b.discountMinor ?? 0)], ['Payer share', b.payerAmountMinor], ['Patient share', b.patientAmountMinor], ['Paid', b.paidMinor]].map(([k, v]) => v != null && <div key={k as string} className="flex justify-between"><dt className="text-slate-500">{k}</dt><dd>{money(v as number)}</dd></div>)}
-              <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-semibold dark:border-slate-700"><dt>Balance</dt><dd>{money(balance)}</dd></div>
+              <div className="flex justify-between border-t border-slate-200/70 pt-2 text-base font-extrabold dark:border-white/10"><dt>Balance</dt><dd>{money(balance)}</dd></div>
             </dl>
             <div className="mt-3 flex flex-wrap items-center gap-2"><StatusBadge status={b.status} />{b.etimsInvoiceNo && <span className="text-xs text-slate-500">eTIMS {b.etimsInvoiceNo}</span>}</div>
           </Card>
           <Card title="Payments">
-            {(b.payments ?? []).length ? <ul className="space-y-2 text-sm">{b.payments.map((p: any) => <li key={p.id} className="flex items-center justify-between"><span>{p.method} <StatusBadge status={p.status} /> <span className="text-xs text-slate-500">{p.reference ?? ''} · {dateTime(p.createdAt)}</span></span><span className="flex items-center gap-2">{money(p.amountMinor)}<button onClick={() => showReceipt(p)} aria-label="Print receipt"><Printer className="h-4 w-4 text-slate-500" /></button></span></li>)}</ul> : <p className="text-sm text-slate-500">No payments yet</p>}
+            {(b.payments ?? []).length ? <ul className="m-0 list-none space-y-2 p-0 text-sm">{b.payments.map((p: any) => <li key={p.id} className="flex items-center justify-between"><span>{p.method} <StatusBadge status={p.status} /> <span className="text-xs text-slate-500">{p.reference ?? ''} · {dateTime(p.createdAt)}</span></span><span className="flex items-center gap-2">{money(p.amountMinor)}<button className="btn ghost xs icon" onClick={() => showReceipt(p)} aria-label="Print receipt"><Printer /></button></span></li>)}</ul> : <p className="m-0 text-sm text-slate-500">No payments yet. Use Cash, Card or M-Pesa above.</p>}
           </Card>
         </div>
       </div>
@@ -68,7 +74,7 @@ export default function BillDetail({ params }: { params: Promise<{ id: string }>
       <Modal open={dlg === 'mpesa'} onClose={() => setDlg('')} title="M-Pesa payment">
         <MpesaStk amountMinor={balance} body={{ billId: id }} defaultPhone={patient?.phone} onSuccess={(r) => { refresh(); showReceipt(r); }} />
       </Modal>
-      <Modal open={dlg === 'receipt'} onClose={() => setDlg('')} title="Receipt" footer={<button className="btn-primary" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>}>
+      <Modal open={dlg === 'receipt'} onClose={() => setDlg('')} title="Receipt" footer={<button className="btn primary" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button>}>
         <Receipt bill={b} payment={receipt} />
       </Modal>
     </div>

@@ -156,7 +156,11 @@ export class InpatientService {
     const a = await this.prisma.admission.findFirst({ where: { id, tenantId }, include: { visit: { include: { patient: true, vitals: { orderBy: { takenAt: 'desc' }, take: 20 }, diagnoses: true, prescriptions: true } } } });
     if (!a) throw new NotFoundException('Admission not found');
     const mar = await this.prisma.medicationAdministration.findMany({ where: { tenantId, admissionId: id }, orderBy: { scheduledAt: 'asc' } });
-    return { ...a, mar };
+    const [ward, bed] = await Promise.all([
+      this.prisma.ward.findFirst({ where: { id: a.wardId, tenantId }, select: { id: true, name: true, type: true } }),
+      a.bedId ? this.prisma.bed.findFirst({ where: { id: a.bedId, tenantId }, select: { id: true, label: true } }) : null,
+    ]);
+    return { ...a, mar, ward, bed };
   }
 
   async discharge(user: AuthUser, id: string, dto: DischargeDto) {
