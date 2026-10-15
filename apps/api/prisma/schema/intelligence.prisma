@@ -1,0 +1,85 @@
+// Intelligence, device interfacing & embedded finance (roadmap items 4, 6, 8, 9).
+
+/// Every AI call (LLM or offline fallback) with token usage. Outputs are drafts requiring human sign-off.
+model AiCallLog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  feature      String // SOAP_DRAFT, ICD_SUGGEST, DISCHARGE_DRAFT, CLAIM_RISK
+  model        String // claude model id, or "offline-rules"
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  latencyMs    Int      @default(0)
+  status       String   @default("OK") // OK, ERROR, FALLBACK
+  error        String?
+  entityType   String?
+  entityId     String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+/// Lab analyser / edge agent registered per tenant. apiKeyHash = sha256(apiKey).
+model AnalyzerDevice {
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String
+  protocol   String    @default("ASTM") // ASTM, HL7
+  model      String?
+  apiKeyHash String    @unique
+  keyPrefix  String
+  active     Boolean   @default(true)
+  lastSeenAt DateTime?
+  testMap    Json      @default("{}") // analyser test code -> LabTest.code
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+/// Embedded-finance partner (lender). API key is global; data access requires a tenant consent.
+model FinancePartner {
+  id         String   @id @default(uuid())
+  name       String
+  apiKeyHash String   @unique
+  keyPrefix  String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  consents   FinanceConsent[]
+}
+
+model FinanceConsent {
+  id        String         @id @default(uuid())
+  tenantId  String
+  partnerId String
+  partner   FinancePartner @relation(fields: [partnerId], references: [id])
+  scopes    String[]       @default(["receivables:read", "financing:read"])
+  grantedBy String?
+  grantedAt DateTime       @default(now())
+  revokedAt DateTime?
+
+  @@unique([tenantId, partnerId])
+}
+
+model FinancingRequest {
+  id                String    @id @default(uuid())
+  tenantId          String
+  requestNumber     String
+  partnerId         String?
+  payerId           String?
+  receivablesMinor  Int
+  requestedMinor    Int
+  offeredMinor      Int?
+  feeMinor          Int?
+  currency          String    @default("KES")
+  status            String    @default("REQUESTED") // REQUESTED, UNDER_REVIEW, OFFERED, ACCEPTED, DISBURSED, DECLINED, REPAID, CANCELLED
+  claimIds          String[]  @default([])
+  notes             String?
+  partnerNote       String?
+  requestedBy       String?
+  history           Json      @default("[]")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([tenantId, requestNumber])
+  @@index([tenantId, status])
+}

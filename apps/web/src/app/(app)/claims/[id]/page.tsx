@@ -5,6 +5,7 @@ import { Table } from '@/components/DataTable';
 import { Card, ErrorNote, KV, Loading, PageHeader, Spinner, StatusBadge } from '@/components/ui';
 import { useAction, useGet } from '@/lib/hooks';
 import { dateTime, fullName, money } from '@/lib/format';
+import { AiClaimRisk } from '@/components/AiDraft';
 
 const SEV = { ERROR: { icon: AlertCircle, cls: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300' }, WARNING: { icon: AlertTriangle, cls: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300' }, INFO: { icon: Info, cls: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300' } } as const;
 
@@ -34,6 +35,7 @@ export default function ClaimDetail({ params }: { params: Promise<{ id: string }
           <Card title={`Scrub issues (${issues.length})`}>
             {issues.length ? <ul className="space-y-2">{issues.map((i, k) => { const s = SEV[(i.severity as keyof typeof SEV)] ?? SEV.INFO; return <li key={k} className={`flex gap-2 rounded-lg border p-2 text-sm ${s.cls}`}><s.icon className="mt-0.5 h-4 w-4 shrink-0" /><span><b>{i.code}</b> {i.message}{i.lineRef && <span className="block text-xs opacity-80">Line: {i.lineRef}</span>}</span></li>; })}</ul>
               : <p className="flex items-center gap-2 text-sm text-emerald-700"><ShieldCheck className="h-4 w-4" />No issues. Claim is clean.</p>}
+            <div className="mt-3"><AiClaimRisk claimId={id} /></div>
           </Card>
           <Card title="Claim lines"><Table rows={c.lines ?? []} columns={[{ key: 'code', header: 'Code' }, { key: 'description', header: 'Description' }, { key: 'quantity', header: 'Qty' }, { key: 'amountMinor', header: 'Amount', render: (l: any) => money(l.amountMinor) }, { key: 'approvedMinor', header: 'Approved', render: (l: any) => money(l.approvedMinor) }]} /></Card>
         </div>

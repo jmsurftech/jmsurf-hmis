@@ -10,12 +10,14 @@ import { MaternityModule } from './maternity/maternity.module';
 import { TheatreModule } from './theatre/theatre.module';
 import { DialysisModule } from './dialysis/dialysis.module';
 import { HomecareModule } from './homecare/homecare.module';
+import { CLINICAL_SUPPORT_MODULES } from './support-common/support.modules';
 
 // Aggregator module: import every clinical sub-module here.
 @Module({
   imports: [
     PatientsModule, VisitsModule, EmrModule, OrdersModule, InventoryModule, PharmacyModule,
     InpatientModule, MaternityModule, TheatreModule, DialysisModule, HomecareModule,
+    ...CLINICAL_SUPPORT_MODULES,
   ],
 })
 export class ClinicalModule {}

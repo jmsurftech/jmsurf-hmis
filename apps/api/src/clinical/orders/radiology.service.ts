@@ -5,6 +5,7 @@ import { AuditService } from '../../common/audit.service';
 import { AuthUser } from '../../common/auth-user';
 import { paginate } from '../shared/pagination';
 import { ImagingReportDto, WorklistQueryDto } from './orders.dto';
+import { viewerUrl } from '../../integrations/pacs/pacs';
 
 @Injectable()
 export class RadiologyService {
@@ -25,7 +26,9 @@ export class RadiologyService {
     return paginate(q, (skip, take) => this.prisma.order.findMany({
       where, skip, take, orderBy: { createdAt: 'asc' },
       include: { imagingReport: true, visit: { select: { visitNumber: true, patient: { select: { id: true, mrn: true, firstName: true, lastName: true, sex: true, dateOfBirth: true } } } } },
-    }), () => this.prisma.order.count({ where }));
+    }), () => this.prisma.order.count({ where })).then((r) => ({
+      ...r, data: r.data.map((o) => ({ ...o, imagingReport: o.imagingReport ? { ...o.imagingReport, viewerUrl: viewerUrl(o.imagingReport.studyUid) } : null })),
+    }));
   }
 
   async start(user: AuthUser, id: string) {
@@ -42,7 +45,7 @@ export class RadiologyService {
       ? await this.prisma.imagingReport.update({ where: { id: o.imagingReport.id }, data })
       : await this.prisma.imagingReport.create({ data: { ...data, tenantId: user.tenantId, orderId: o.id } });
     await this.prisma.order.update({ where: { id }, data: { status: 'COMPLETED' } });
-    return rep;
+    return { ...rep, viewerUrl: viewerUrl(rep.studyUid) };
   }
 
   async verify(user: AuthUser, id: string) {

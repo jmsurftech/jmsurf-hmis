@@ -34,3 +34,44 @@ Skeleton adapters (`integrations/fiscal/fiscal-skeletons.ts`) for URA EFRIS (UG)
 
 ## SMS
 `SMS_PROVIDER=mock` writes to `Notification` (status `SENT_MOCK`). `africastalking` posts to `/version1/messaging`. Ports carry no tenant, so the tenant comes from the async integration context (`withTenant`), falling back to `SYSTEM`.
+
+## Pan-African adapters (fiscal, national insurance, mobile money)
+
+All adapters build their payloads with pure, unit-tested functions (`apps/api/src/integrations/fiscal/*.ts`,
+`apps/api/src/integrations/africa/*.ts`), read endpoints and credentials from env, and default to the mock servers
+(`apps/mock-servers/src/africa.ts`). Selection is by `tenant.countryCode` (via `CountryResolver`: explicit
+`withTenant(..., countryCode)` or the tenant row). Payloads were written against publicly available descriptions of each
+spec; confirm field names against the authority's current certified documentation before go-live.
+
+| Country | Fiscal | Assumptions |
+|---|---|---|
+| UG | URA EFRIS T109 | Envelope `{data:{content(base64), signature, dataDescription}, globalInfo, returnStateInfo}`; tax categories 01 standard / 02 zero / 03 exempt. **Signature is an HMAC placeholder**: production must fetch the AES key (T104) and RSA-sign the content with the taxpayer private key; content is sent unencrypted (`encryptCode` handling to be completed). Default UoM `101`, commodity `85121800` (`EFRIS_DEFAULT_*`). |
+| TZ | TRA VFD | Token via `/vfdtoken` (password grant), XML `<EFDMS><RCT>…</RCT><EFDMSSIGNATURE>` posted with `Routing-Key: vfdrct`. Tax codes 1=A 18%, 2=B, 5=E exempt. **Signature is an HMAC placeholder** (production: SHA1withRSA with the TRA-issued .pfx). GC/DC/RCTNUM counters are in-memory per process; persist them before production. Verify URL `https://verify.tra.go.tz/{RCTVNUM}_{HHmmss}`. |
+| RW | RRA EBM v2 (VSDC) | eTIMS-family `trnsSales/saveSales`; tax types A exempt, B 18%. |
+| ZM | ZRA Smart Invoice (VSDC) | Same VSDC model; tax types A 16% standard, D exempt. |
+| GH | GRA E-VAT | INCLUSIVE invoice with levies A=NHIL, B=GETFund, C=COVID. Defaults follow the 2026 reform (COVID levy 0, VAT not compounded on levies); set `GRA_COVID_RATE_BP=100 GRA_VAT_ON_LEVIES=true` for the older regime. Response key `mesaage` (sic) is accepted as in GRA samples. |
+| NG | FIRS e-Invoicing (MBS) | UBL-aligned JSON, IRN `{invoiceNo}-{serviceId}-{YYYYMMDD}`, validate then sign, `x-api-key`/`x-api-secret`. Exempt medical lines use category `EXEMPTED`. |
+
+National insurance (`NATIONAL_INSURANCE` router): KE → SHA/HIE, **TZ → NHIF** (`/claimsserver/Token`, card verification
+`/verification/AuthorizeCard`, `Claims/SubmitFolios` folio builder from the FHIR claim bundle; ICD-10 codes expected),
+**GH → NHIA** (Claim-IT style JSON with G-DRG codes; CCC replaces pre-authorisation; items whose code is ≥6 letters followed by
+a digit are treated as medicines). Other countries fall back to the SHA adapter (sandbox) until built.
+
+Mobile money (`MOBILE_MONEY` router): KE → M-Pesa; UG/RW/GH/ZM → **MTN MoMo Collection** (`/collection/token/`,
+`requesttopay` with `X-Reference-Id`, `X-Target-Environment`); TZ → **Airtel Money** (`/merchant/v1/payments/`, MSISDN without
+country code). Override per country with `MOBILE_MONEY_PROVIDER_<CC>=mpesa|mtn|airtel`. Amounts are sent as whole major
+units (ceil of minor/100). MoMo/Airtel payment callbacks are not yet reconciled into `Payment` (M-Pesa callback flow only);
+poll status or add a callback handler before go-live.
+
+## AI assistance
+- Model `AI_MODEL` (default `claude-opus-5-5`) via `@anthropic-ai/sdk`, structured JSON outputs, effort `AI_EFFORT` (default low).
+  Server-side refusal fallback (`fallbacks: "default"`) is enabled for models that support it; `AI_REFUSAL_FALLBACK=off` disables.
+- Without `ANTHROPIC_API_KEY` deterministic rule-based fallbacks run (marked `source: OFFLINE`). Tenants must opt in (`settings.aiEnabled`).
+- Text is de-identified (`ai/deidentify.ts`) before leaving the platform; sensitive notes are excluded from discharge drafts unless `includeSensitive=true`.
+- Every call is logged in `AiCallLog` with token usage. All outputs are drafts requiring human sign-off.
+
+## Embedded finance partner API
+- Partners are registered by a platform super-admin (`POST /api/financing/partners`, key shown once, stored hashed).
+- Data access needs a tenant consent with scopes `receivables:read`, `financing:read`, `financing:decide`.
+- Receivables = APPROVED / PARTIALLY_APPROVED / PAID claims with `approvedMinor - paidMinor > 0`, aged from `decidedAt`.
+- Max advance = 80% of SHA receivables ≤ 90 days old. Status flow REQUESTED → UNDER_REVIEW → OFFERED → ACCEPTED → DISBURSED → REPAID (DECLINED/CANCELLED terminal).

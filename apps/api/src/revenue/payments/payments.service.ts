@@ -8,6 +8,7 @@ import { withTenant } from '../../integrations/integration-context';
 import { IntegrationHttpService } from '../../integrations/http-client';
 import { c2bAccept, c2bReject, parseC2B, parseStkCallback } from '../../integrations/ke/mpesa/mpesa.util';
 import { pageArgs, paged } from '../list-query';
+import { settleSubscriptionStk } from '../../platform/subscription.service';
 import { PaymentListQuery, ReceiptDto, RefundDto, StkDto } from './payments.dto';
 
 @Injectable()
@@ -88,6 +89,7 @@ export class PaymentsService {
     }
     const payment = await this.prisma.payment.findFirst({ where: { method: 'MPESA', reference: cb.checkoutRequestId } });
     await this.http.logInbound('mpesa', 'stk.callback', payload, payment?.tenantId, cb.checkoutRequestId);
+    if (!payment && (await settleSubscriptionStk(this.prisma, cb))) return { ResultCode: 0, ResultDesc: 'Accepted' };
     if (!payment) { this.log.warn(`STK callback for unknown CheckoutRequestID ${cb.checkoutRequestId}`); return { ResultCode: 0, ResultDesc: 'Accepted' }; }
     if (payment.status !== 'PENDING') return { ResultCode: 0, ResultDesc: 'Already processed' };
     await this.prisma.payment.update({

@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { hash, personFor } from './people';
+import { africaMocks } from './africa';
 
 /**
  * JMSURF HMIS mock servers. Paths mirror what the API adapters call (see apps/api/src/integrations and
@@ -171,6 +172,9 @@ const sms = (req: Request, res: Response) => {
 };
 app.post('/sms', sms);
 app.post('/sms/version1/messaging', sms);
+
+// ───────────── Pan-African adapters (UG/TZ/RW/GH/ZM/NG fiscal, TZ NHIF, GH NHIA, MTN MoMo, Airtel) ─────────────
+app.use(africaMocks(remember));
 
 const port = Number(process.env.PORT ?? 4100);
 app.listen(port, () => console.log(`[mock] JMSURF mock servers listening on :${port}`));

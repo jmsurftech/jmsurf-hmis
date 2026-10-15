@@ -8,6 +8,7 @@ import { useAction, useList } from '@/lib/hooks';
 import { fullName } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PICK } from '@/lib/pickers';
+import { TelemedicineJoin } from '@/components/TelemedicineJoin';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function Appointments() {
@@ -43,7 +44,8 @@ function Appointments() {
               <div className="flex justify-between"><span className="font-medium">{String(a.startAt).slice(11, 16)} · {fullName(a.patient)}</span><StatusBadge status={a.status} /></div>
               <p className="text-xs text-slate-500">{a.mode} {a.reason ?? ''}</p>
               {!['CANCELLED', 'DONE', 'NO_SHOW'].includes(a.status) && <div className="mt-2 flex gap-1">
-                {a.status !== 'ARRIVED' && <button className="btn-primary px-2 py-0.5 text-[10px]" onClick={() => checkIn.mutate({ id: a.id })}>CHECK IN</button>}
+                {a.mode === 'TELEMEDICINE' && <TelemedicineJoin appointmentId={a.id} compact />}
+                {a.status !== 'ARRIVED' && a.mode !== 'TELEMEDICINE' && <button className="btn-primary px-2 py-0.5 text-[10px]" onClick={() => checkIn.mutate({ id: a.id })}>CHECK IN</button>}
                 {['DONE', 'NO_SHOW', 'CANCELLED'].map((s) => <button key={s} className="btn-secondary px-2 py-0.5 text-[10px]" onClick={() => status.mutate({ id: a.id, status: s })}>{s.replace('_', ' ')}</button>)}</div>}
             </li>))}</ul> : <p className="text-sm text-slate-500">No appointments</p>}
         </Card>

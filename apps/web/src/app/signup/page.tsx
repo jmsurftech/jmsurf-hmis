@@ -21,7 +21,7 @@ const schema = z.object({
   lastName: z.string().min(1, 'Required'),
   email: z.string().email(),
   phone: z.string().optional(),
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string().min(10, 'At least 10 characters').regex(/[a-z]/, 'Add a lowercase letter').regex(/[A-Z]/, 'Add an uppercase letter').regex(/\d/, 'Add a digit').regex(/[^A-Za-z0-9]/, 'Add a symbol'),
   confirm: z.string(),
 }).refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
 type F = z.infer<typeof schema>;
@@ -37,8 +37,8 @@ export default function Signup() {
   const submit = handleSubmit(async ({ confirm: _c, plan: _p, ...v }) => {
     setErr('');
     try {
-      const r = await api.post<{ accessToken: string; user: AuthUser }>('/auth/signup', v);
-      setSession(r.accessToken, r.user); router.replace('/dashboard');
+      const r = await api.post<{ accessToken: string; refreshToken?: string; user: AuthUser }>('/auth/signup', v);
+      setSession(r.accessToken, r.user, r.refreshToken); router.replace('/dashboard');
     } catch (e) { setErr((e as Error).message); }
   });
   const v = getValues();

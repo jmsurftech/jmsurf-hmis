@@ -11,6 +11,11 @@ import { BillingCoreModule } from './billing/billing-core.service';
 import { ClinicalModule } from './clinical/clinical.module';
 import { RevenueModule } from './revenue/revenue.module';
 import { BackOfficeModule } from './backoffice/backoffice.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { PlatformModule } from './platform/platform.module';
+import { SuperAdminGuard, TenantAccessGuard, TenantThrottlerGuard } from './platform/guards';
+import { EngagementModule } from './engagement/engagement.module';
+import { IntelligenceModule } from './intelligence.module';
 
 @Controller('health')
 class HealthController {
@@ -26,11 +31,16 @@ class HealthController {
   imports: [
     ScheduleModule.forRoot(),
     PrismaModule, SequenceModule, AuditModule, BillingCoreModule, AuthModule,
-    RevenueModule, ClinicalModule, BackOfficeModule,
+    RevenueModule, ClinicalModule, BackOfficeModule, IntelligenceModule, EngagementModule,
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: Number(process.env.API_RATE_LIMIT_PER_MIN || 1200) }]),
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: TenantThrottlerGuard },
+    { provide: APP_GUARD, useClass: SuperAdminGuard },
+    { provide: APP_GUARD, useClass: TenantAccessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })

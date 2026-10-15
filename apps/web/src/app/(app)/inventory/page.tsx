@@ -6,6 +6,7 @@ import { FormDialog } from '@/components/FormDialog';
 import { PageHeader, StatusBadge, Tabs } from '@/components/ui';
 import { date, dateTime, money } from '@/lib/format';
 import { PICK } from '@/lib/pickers';
+import { StockForecast } from '@/components/StockForecast';
 
 export default function Inventory() {
   const [tab, setTab] = useState('stock'); const [dlg, setDlg] = useState<'' | 'item' | 'grn' | 'transfer' | 'store'>('');
@@ -16,7 +17,7 @@ export default function Inventory() {
         <button className="btn-secondary" onClick={() => setDlg('item')}><Plus className="h-4 w-4" />Item</button>
         <button className="btn-secondary" onClick={() => setDlg('transfer')}><ArrowLeftRight className="h-4 w-4" />Transfer</button>
         <button className="btn-primary" onClick={() => setDlg('grn')}><PackagePlus className="h-4 w-4" />Receive (GRN)</button></>} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'stock', label: 'Stock levels' }, { id: 'items', label: 'Item master' }, { id: 'reorder', label: 'Reorder alerts' }, { id: 'expiry', label: 'Expiry alerts' }, { id: 'movements', label: 'Movements' }, { id: 'stores', label: 'Stores' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'stock', label: 'Stock levels' }, { id: 'items', label: 'Item master' }, { id: 'reorder', label: 'Reorder alerts' }, { id: 'forecast', label: 'Demand forecast' }, { id: 'expiry', label: 'Expiry alerts' }, { id: 'movements', label: 'Movements' }, { id: 'stores', label: 'Stores' }]} />
       {tab === 'stock' && <DataTable path="/inventory/levels" columns={[
         { key: 'code', header: 'Code' }, { key: 'name', header: 'Item' }, { key: 'store', header: 'Store' }, { key: 'unit', header: 'Unit' },
         { key: 'quantity', header: 'On hand', className: 'text-right' }, { key: 'reorderLevel', header: 'Reorder lvl', className: 'text-right' },
@@ -30,6 +31,7 @@ export default function Inventory() {
       {tab === 'reorder' && <DataTable path="/inventory/reorder-alerts" searchable={false} emptyMessage="All items are above reorder level" columns={[
         { key: 'name', header: 'Item', render: (i: any) => <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" />{i.name}</span> }, { key: 'code', header: 'Code' },
         { key: 'onHand', header: 'On hand' }, { key: 'reorderLevel', header: 'Reorder level' }, { key: 'suggestedOrder', header: 'Suggested order' }]} />}
+      {tab === 'forecast' && <StockForecast />}
       {tab === 'expiry' && <DataTable path="/inventory/expiry-report" searchable={false} query={{ days: 90 }} emptyMessage="No batches expiring in the next 90 days" columns={[
         { key: 'name', header: 'Item', render: (b: any) => <span className="flex items-center gap-2"><CalendarX className="h-4 w-4 text-red-500" />{b.item?.name}</span> }, { key: 'batchNo', header: 'Batch' },
         { key: 'expiryDate', header: 'Expiry', render: (b: any) => date(b.expiryDate) }, { key: 'quantity', header: 'Qty' }, { key: 'valueMinor', header: 'Value', render: (b: any) => money(b.valueMinor) },

@@ -1,0 +1,547 @@
+// JMSURF HMIS — clinical support & programmes (roadmap item 5)
+// Blood bank, mortuary, CSSD, ambulance/EMS, dietetics, rehab, HIV/TB, oncology, FP/NCD clinics.
+// Cross-domain references (patientId, visitId, admissionId, surgeryId, wardId) are plain ids validated in services.
+
+// ───────────────────────────── Blood bank ─────────────────────────────
+
+model BloodDonor {
+  id            String          @id @default(uuid())
+  tenantId      String
+  donorNumber   String
+  firstName     String
+  lastName      String
+  sex           String
+  dateOfBirth   DateTime?
+  phone         String?
+  nationalId    String?
+  abo           String? // A, B, AB, O
+  rh            String? // POS, NEG
+  eligible      Boolean         @default(true)
+  deferralReason String?
+  deferredUntil DateTime?
+  lastDonationAt DateTime?
+  donations     BloodDonation[]
+  createdAt     DateTime        @default(now())
+
+  @@unique([tenantId, donorNumber])
+  @@index([tenantId, lastName])
+}
+
+model BloodDonation {
+  id          String     @id @default(uuid())
+  tenantId    String
+  donorId     String
+  donor       BloodDonor @relation(fields: [donorId], references: [id])
+  donatedAt   DateTime   @default(now())
+  volumeMl    Int        @default(450)
+  hbGdl       Float?
+  ttiResults  Json? // {hiv, hbv, hcv, syphilis, malaria}: NEG|POS|PENDING
+  ttiStatus   String     @default("PENDING") // PENDING, PASSED, FAILED
+  status      String     @default("COLLECTED") // COLLECTED, SCREENED, DISCARDED
+  units       BloodUnit[]
+  collectedById String?
+  createdAt   DateTime   @default(now())
+
+  @@index([tenantId, donatedAt])
+}
+
+model BloodUnit {
+  id           String         @id @default(uuid())
+  tenantId     String
+  unitNumber   String
+  donationId   String?
+  donation     BloodDonation? @relation(fields: [donationId], references: [id])
+  abo          String
+  rh           String
+  component    String // WHOLE_BLOOD, PRBC, FFP, PLATELETS, CRYO
+  volumeMl     Int            @default(450)
+  collectedAt  DateTime       @default(now())
+  expiresAt    DateTime
+  status       String         @default("QUARANTINE") // QUARANTINE, AVAILABLE, RESERVED, ISSUED, TRANSFUSED, EXPIRED, DISCARDED
+  reservedForRequestId String?
+  issuedToPatientId String?
+  issuedAt     DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@unique([tenantId, unitNumber])
+  @@index([tenantId, status, abo, rh, component])
+  @@index([tenantId, expiresAt])
+}
+
+model BloodRequest {
+  id             String   @id @default(uuid())
+  tenantId       String
+  requestNumber  String
+  patientId      String
+  visitId        String
+  orderId        String?
+  component      String
+  unitsRequested Int      @default(1)
+  urgency        String   @default("ROUTINE") // ROUTINE, URGENT, EMERGENCY
+  indication     String?
+  patientAbo     String?
+  patientRh      String?
+  antibodyScreen String? // NEGATIVE, POSITIVE
+  status         String   @default("REQUESTED") // REQUESTED, GROUPED, CROSSMATCHED, ISSUED, COMPLETED, CANCELLED
+  crossmatches   BloodCrossmatch[]
+  requestedById  String?
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, requestNumber])
+  @@index([tenantId, status])
+}
+
+model BloodCrossmatch {
+  id          String       @id @default(uuid())
+  tenantId    String
+  requestId   String
+  request     BloodRequest @relation(fields: [requestId], references: [id])
+  unitId      String
+  method      String       @default("IAT") // IS, IAT, ELECTRONIC
+  result      String // COMPATIBLE, INCOMPATIBLE
+  performedById String?
+  performedAt DateTime     @default(now())
+}
+
+model Transfusion {
+  id           String    @id @default(uuid())
+  tenantId     String
+  unitId       String
+  requestId    String?
+  patientId    String
+  visitId      String
+  issuedAt     DateTime  @default(now())
+  issuedById   String?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  volumeMl     Int?
+  preVitals    Json?
+  postVitals   Json?
+  status       String    @default("ISSUED") // ISSUED, IN_PROGRESS, COMPLETED, STOPPED, RETURNED
+  reaction     Boolean   @default(false)
+  reactionType String? // FEBRILE, ALLERGIC, HAEMOLYTIC, TACO, TRALI, ANAPHYLAXIS, OTHER
+  reactionSeverity String? // MILD, MODERATE, SEVERE, FATAL
+  reactionNotes String?
+  reactionAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, patientId])
+}
+
+// ───────────────────────────── Mortuary ─────────────────────────────
+
+model MortuaryCompartment {
+  id       String  @id @default(uuid())
+  tenantId String
+  label    String
+  type     String  @default("COLD") // COLD, DEEP_FREEZE
+  status   String  @default("AVAILABLE") // AVAILABLE, OCCUPIED, MAINTENANCE
+
+  @@unique([tenantId, label])
+}
+
+model MortuaryCase {
+  id            String    @id @default(uuid())
+  tenantId      String
+  caseNumber    String
+  source        String // WARD_DEATH, BROUGHT_IN_DEAD
+  patientId     String
+  admissionId   String?
+  visitId       String // mortuary billing visit
+  deceasedName  String
+  sex           String?
+  ageYears      Int?
+  dateOfDeath   DateTime
+  causeOfDeath  String?
+  broughtBy     String?
+  policeObNumber String?
+  compartmentId String?
+  admittedAt    DateTime  @default(now())
+  lastChargedAt DateTime?
+  status        String    @default("IN_STORAGE") // IN_STORAGE, RELEASED
+  pmStatus      String? // REQUESTED, DONE
+  pmRequestedBy String?
+  pmReason      String?
+  pmRequestedAt DateTime?
+  pmPathologist String?
+  pmFindings    String?
+  pmCauseOfDeath String?
+  pmCompletedAt DateTime?
+  releasedAt    DateTime?
+  releasedTo    String?
+  releasedToIdNo String?
+  releasedToRelationship String?
+  burialPermitNo String?
+  burialPermitDate DateTime?
+  disposalMethod String? // BURIAL, CREMATION
+  destination   String?
+  createdAt     DateTime  @default(now())
+
+  @@unique([tenantId, caseNumber])
+  @@index([tenantId, status])
+}
+
+// ───────────────────────────── CSSD ─────────────────────────────
+
+model InstrumentSet {
+  id         String   @id @default(uuid())
+  tenantId   String
+  code       String
+  name       String
+  department String?
+  items      Json // [{name, qty}]
+  status     String   @default("DIRTY") // DIRTY, PROCESSING, STERILE, ISSUED, RECALLED
+  lastCycleId String?
+  sterileUntil DateTime?
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, code])
+}
+
+model SterilisationCycle {
+  id           String    @id @default(uuid())
+  tenantId     String
+  cycleNumber  String
+  machine      String
+  method       String    @default("STEAM") // STEAM, ETO, PLASMA
+  setIds       String[]
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  temperatureC Float?
+  pressureKpa  Float?
+  durationMin  Int?
+  chemicalIndicator String? // PASS, FAIL
+  biologicalIndicator String? // PASS, FAIL, PENDING
+  bowieDick    String? // PASS, FAIL
+  status       String    @default("RUNNING") // RUNNING, PASSED, FAILED, RECALLED
+  operatorId   String?
+  recallReason String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([tenantId, cycleNumber])
+}
+
+model SetIssue {
+  id         String    @id @default(uuid())
+  tenantId   String
+  setId      String
+  cycleId    String?
+  surgeryId  String?
+  patientId  String?
+  location   String?
+  issuedAt   DateTime  @default(now())
+  returnedAt DateTime?
+
+  @@index([tenantId, cycleId])
+  @@index([tenantId, setId])
+}
+
+// ───────────────────────────── Ambulance / EMS ─────────────────────────────
+
+model Ambulance {
+  id         String   @id @default(uuid())
+  tenantId   String
+  regNumber  String
+  callSign   String?
+  type       String   @default("BLS") // BLS, ALS, TRANSPORT
+  status     String   @default("AVAILABLE") // AVAILABLE, DISPATCHED, MAINTENANCE
+  odometerKm Int      @default(0)
+
+  @@unique([tenantId, regNumber])
+}
+
+model AmbulanceTrip {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tripNumber     String
+  requestedAt    DateTime  @default(now())
+  callerName     String?
+  callerPhone    String?
+  patientId      String?
+  patientName    String?
+  pickupLocation String
+  dropoffLocation String?
+  priority       String    @default("ROUTINE") // ROUTINE, URGENT, EMERGENCY
+  complaint      String?
+  ambulanceId    String?
+  crew           String[]
+  status         String    @default("REQUESTED") // REQUESTED, DISPATCHED, AT_SCENE, TRANSPORTING, COMPLETED, CANCELLED
+  dispatchedAt   DateTime?
+  atSceneAt      DateTime?
+  pickedUpAt     DateTime?
+  droppedAt      DateTime?
+  odometerStart  Int?
+  odometerEnd    Int?
+  mileageKm      Float?
+  notes          String?
+  visitId        String?
+  chargedMinor   Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  @@unique([tenantId, tripNumber])
+  @@index([tenantId, status])
+}
+
+// ───────────────────────────── Dietetics ─────────────────────────────
+
+model DietOrder {
+  id          String    @id @default(uuid())
+  tenantId    String
+  admissionId String
+  patientId   String
+  wardId      String
+  dietType    String // NORMAL, DIABETIC, RENAL, LOW_SALT, SOFT, LIQUID, HIGH_PROTEIN, NPO
+  texture     String?
+  allergies   String?
+  notes       String?
+  startAt     DateTime  @default(now())
+  endAt       DateTime?
+  status      String    @default("ACTIVE") // ACTIVE, STOPPED
+  orderedById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, wardId, status])
+}
+
+model MealPlan {
+  id          String   @id @default(uuid())
+  tenantId    String
+  date        DateTime @db.Date
+  meal        String // BREAKFAST, LUNCH, SUPPER
+  wardId      String
+  wardName    String
+  items       Json // [{patientId, patientName, bed, dietType, texture, allergies, notes}]
+  counts      Json // {dietType: n}
+  generatedAt DateTime @default(now())
+
+  @@unique([tenantId, date, meal, wardId])
+}
+
+// ───────────────────────────── Rehab ─────────────────────────────
+
+model RehabPlan {
+  id             String   @id @default(uuid())
+  tenantId       String
+  patientId      String
+  therapy        String   @default("PHYSIO") // PHYSIO, OT, SPEECH
+  diagnosis      String
+  goals          String?
+  frequency      String?
+  plannedSessions Int     @default(10)
+  outcomeMeasure String? // e.g. BARTHEL, VAS_PAIN, TUG, ROM
+  baselineScore  Float?
+  targetScore    Float?
+  therapistId    String?
+  startDate      DateTime @default(now())
+  status         String   @default("ACTIVE") // ACTIVE, COMPLETED, DISCONTINUED
+  sessions       RehabSession[]
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, patientId])
+}
+
+model RehabSession {
+  id            String    @id @default(uuid())
+  tenantId      String
+  planId        String
+  plan          RehabPlan @relation(fields: [planId], references: [id])
+  sessionAt     DateTime  @default(now())
+  durationMin   Int?
+  interventions String?
+  notes         String?
+  painScore     Int?
+  outcomeScore  Float?
+  visitId       String?
+  therapistId   String?
+  createdAt     DateTime  @default(now())
+}
+
+// ───────────────────────────── HIV / TB programmes ─────────────────────────────
+
+model HivEnrolment {
+  id            String    @id @default(uuid())
+  tenantId      String
+  patientId     String
+  cccNumber     String
+  enrolledAt    DateTime  @default(now())
+  entryPoint    String? // VCT, OPD, IPD, PMTCT, TB, CWC
+  whoStage      Int?
+  artStartDate  DateTime?
+  currentRegimen String?
+  pmtct         Boolean   @default(false)
+  status        String    @default("ACTIVE") // ACTIVE, TRANSFERRED_OUT, LTFU, DEAD, STOPPED
+  regimens      ArtRegimen[]
+  viralLoads    ViralLoad[]
+  appointments  HivAppointment[]
+  createdAt     DateTime  @default(now())
+
+  @@unique([tenantId, cccNumber])
+  @@unique([tenantId, patientId])
+}
+
+model ArtRegimen {
+  id          String       @id @default(uuid())
+  tenantId    String
+  enrolmentId String
+  enrolment   HivEnrolment @relation(fields: [enrolmentId], references: [id])
+  regimen     String
+  line        String       @default("FIRST") // FIRST, SECOND, THIRD
+  startDate   DateTime
+  endDate     DateTime?
+  changeReason String?
+}
+
+model ViralLoad {
+  id          String       @id @default(uuid())
+  tenantId    String
+  enrolmentId String
+  enrolment   HivEnrolment @relation(fields: [enrolmentId], references: [id])
+  sampleDate  DateTime
+  copiesPerMl Int?
+  ldl         Boolean      @default(false)
+  suppressed  Boolean
+  createdAt   DateTime     @default(now())
+}
+
+model HivAppointment {
+  id          String       @id @default(uuid())
+  tenantId    String
+  enrolmentId String
+  enrolment   HivEnrolment @relation(fields: [enrolmentId], references: [id])
+  scheduledAt DateTime
+  purpose     String       @default("CLINICAL") // CLINICAL, REFILL, VL, COUNSELLING
+  attendedAt  DateTime?
+  status      String       @default("SCHEDULED") // SCHEDULED, ATTENDED, MISSED
+  tracingOutcome String? // CONTACTED_RETURNED, CONTACTED_WILL_RETURN, NOT_REACHED, TRANSFERRED, DEAD
+  tracingNotes String?
+
+  @@index([tenantId, scheduledAt])
+}
+
+model TbCase {
+  id             String   @id @default(uuid())
+  tenantId       String
+  patientId      String
+  tbNumber       String
+  registeredAt   DateTime @default(now())
+  diseaseSite    String   @default("PULMONARY") // PULMONARY, EXTRA_PULMONARY
+  confirmation   String   @default("BACTERIOLOGICAL") // BACTERIOLOGICAL, CLINICAL
+  patientType    String   @default("NEW") // NEW, RELAPSE, TREATMENT_AFTER_LTFU, FAILURE, TRANSFER_IN
+  regimen        String   @default("2RHZE/4RH")
+  phase          String   @default("INTENSIVE") // INTENSIVE, CONTINUATION, COMPLETED
+  intensiveStart DateTime @default(now())
+  continuationStart DateTime?
+  hivStatus      String? // POS, NEG, UNKNOWN
+  outcome        String? // CURED, COMPLETED, FAILED, DIED, LTFU, NOT_EVALUATED
+  outcomeDate    DateTime?
+  doses          TbDot[]
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, tbNumber])
+}
+
+model TbDot {
+  id         String   @id @default(uuid())
+  tenantId   String
+  caseId     String
+  case       TbCase   @relation(fields: [caseId], references: [id])
+  date       DateTime
+  observed   Boolean  @default(true)
+  observer   String?
+  notes      String?
+
+  @@unique([caseId, date])
+}
+
+// ───────────────────────────── Oncology ─────────────────────────────
+
+model ChemoProtocol {
+  id           String   @id @default(uuid())
+  tenantId     String
+  code         String
+  name         String
+  indication   String?
+  cycles       Int
+  intervalDays Int
+  drugs        Json // [{drug, dose, unit: 'mg/m2'|'mg/kg'|'mg'|'AUC', route, days: [1]}]
+  active       Boolean  @default(true)
+
+  @@unique([tenantId, code])
+}
+
+model PatientRegimen {
+  id          String   @id @default(uuid())
+  tenantId    String
+  patientId   String
+  protocolId  String
+  heightCm    Float
+  weightKg    Float
+  bsa         Float
+  doseModPct  Int      @default(100)
+  startDate   DateTime
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, STOPPED
+  cycles      ChemoCycle[]
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, patientId])
+}
+
+model ChemoCycle {
+  id            String         @id @default(uuid())
+  tenantId      String
+  regimenId     String
+  regimen       PatientRegimen @relation(fields: [regimenId], references: [id])
+  cycleNo       Int
+  scheduledDate DateTime
+  status        String         @default("SCHEDULED") // SCHEDULED, ADMINISTERED, DELAYED, CANCELLED
+  plannedDoses  Json? // [{drug, dose, unit, route}]
+  givenDoses    Json?
+  weightKg      Float?
+  bsa           Float?
+  administeredAt DateTime?
+  administeredById String?
+  notes         String?
+  visitId       String?
+
+  @@unique([regimenId, cycleNo])
+}
+
+// ───────────────────────────── FP & NCD clinics ─────────────────────────────
+
+model FpRecord {
+  id          String    @id @default(uuid())
+  tenantId    String
+  patientId   String
+  visitDate   DateTime  @default(now())
+  clientType  String    @default("NEW") // NEW, REVISIT
+  method      String // PILLS_COC, PILLS_POP, INJECTABLE, IMPLANT, IUCD, CONDOMS, EC, BTL, VASECTOMY, NATURAL
+  quantity    Int?
+  removal     Boolean   @default(false)
+  sideEffects String?
+  nextVisitAt DateTime?
+  notes       String?
+  createdById String?
+
+  @@index([tenantId, patientId])
+}
+
+model NcdFollowUp {
+  id          String   @id @default(uuid())
+  tenantId    String
+  patientId   String
+  visitAt     DateTime @default(now())
+  condition   String // HTN, DM, HTN_DM
+  systolic    Int?
+  diastolic   Int?
+  fbs         Float? // mmol/L
+  rbs         Float?
+  hba1c       Float?
+  weightKg    Float?
+  medications String?
+  controlled  Boolean?
+  notes       String?
+  nextVisitAt DateTime?
+  createdById String?
+
+  @@index([tenantId, patientId, visitAt])
+}

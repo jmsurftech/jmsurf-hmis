@@ -1,8 +1,9 @@
 import {
   Activity, BarChart3, Baby, BedDouble, Building2, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, Droplets, FileCheck2,
   FileText, FlaskConical, HeartPulse, Home, LayoutDashboard, ListOrdered, Package, Pill, Receipt, ScanLine, Scissors, Settings,
-  ShieldAlert, ShoppingCart, Stethoscope, Users, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
+  ShieldAlert, ShoppingCart, Video, MessageSquare, BellRing, Upload, Globe, Stethoscope, Users, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
 } from 'lucide-react';
+import { Accessibility, Ambulance, Archive, Droplet, HeartHandshake, Ribbon, ShieldCheck, Syringe, UtensilsCrossed } from 'lucide-react';
 
 export interface NavItem { href: string; label: string; icon: React.ElementType; roles?: string[] }
 export interface NavGroup { label: string; items: NavItem[] }
@@ -15,6 +16,11 @@ export const NAV: NavGroup[] = [
     { href: '/queue', label: 'Queue', icon: ListOrdered, roles: ['RECEPTION', ...CLIN, 'LAB_TECH', 'PHARMACIST', 'CASHIER'] },
     { href: '/appointments', label: 'Appointments', icon: CalendarDays, roles: ['RECEPTION', ...CLIN] },
   ] },
+  { label: 'Engagement', items: [
+    { href: '/telemedicine', label: 'Telemedicine', icon: Video, roles: ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'RECEPTION'] },
+    { href: '/messaging/templates', label: 'Message templates', icon: MessageSquare, roles: ['MANAGER', 'RECEPTION'] },
+    { href: '/messaging/reminders', label: 'Reminders log', icon: BellRing, roles: ['MANAGER', 'RECEPTION'] },
+  ] },
   { label: 'Clinical', items: [
     { href: '/opd', label: 'OPD', icon: Stethoscope, roles: CLIN },
     { href: '/lab', label: 'Laboratory', icon: FlaskConical, roles: ['LAB_TECH', 'DOCTOR', 'CLINICAL_OFFICER'] },
@@ -25,6 +31,15 @@ export const NAV: NavGroup[] = [
     { href: '/theatre', label: 'Theatre', icon: Scissors, roles: ['DOCTOR', 'NURSE'] },
     { href: '/dialysis', label: 'Dialysis', icon: Droplets, roles: ['DOCTOR', 'NURSE'] },
     { href: '/homecare', label: 'Homecare', icon: Home, roles: ['DOCTOR', 'NURSE', 'CLINICAL_OFFICER'] },
+    { href: '/blood-bank', label: 'Blood bank', icon: Droplet, roles: ['LAB_TECH', 'DOCTOR', 'CLINICAL_OFFICER', 'NURSE'] },
+    { href: '/hiv-tb', label: 'HIV & TB', icon: Ribbon, roles: ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE'] },
+    { href: '/fp-ncd', label: 'FP & NCD clinics', icon: HeartHandshake, roles: CLIN },
+    { href: '/oncology', label: 'Oncology', icon: Syringe, roles: ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'PHARMACIST'] },
+    { href: '/rehab', label: 'Physio & rehab', icon: Accessibility, roles: ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE'] },
+    { href: '/dietetics', label: 'Kitchen & diet', icon: UtensilsCrossed, roles: ['NURSE', 'DOCTOR', 'CLINICAL_OFFICER', 'STOREKEEPER'] },
+    { href: '/cssd', label: 'CSSD', icon: ShieldCheck, roles: ['NURSE', 'DOCTOR', 'STOREKEEPER'] },
+    { href: '/ambulance', label: 'Ambulance / EMS', icon: Ambulance, roles: ['RECEPTION', 'NURSE', 'DOCTOR', 'CLINICAL_OFFICER', 'TRIAGE_NURSE'] },
+    { href: '/mortuary', label: 'Mortuary', icon: Archive, roles: ['NURSE', 'DOCTOR', 'CLINICAL_OFFICER', 'RECEPTION'] },
   ] },
   { label: 'Revenue', items: [
     { href: '/billing', label: 'Billing', icon: Receipt, roles: ['CASHIER', 'RECEPTION', 'ACCOUNTANT', 'CLAIMS_OFFICER'] },
@@ -38,6 +53,7 @@ export const NAV: NavGroup[] = [
   ] },
   { label: 'Back office', items: [
     { href: '/finance', label: 'Finance', icon: Landmark, roles: ['ACCOUNTANT', 'MANAGER'] },
+    { href: '/finance/financing', label: 'Receivables financing', icon: Handshake, roles: ['ACCOUNTANT', 'MANAGER'] },
     { href: '/hr', label: 'HR & Payroll', icon: Briefcase, roles: ['HR', 'MANAGER'] },
     { href: '/assets', label: 'Assets', icon: Building2, roles: ['ACCOUNTANT', 'MANAGER', 'STOREKEEPER'] },
     { href: '/budgets', label: 'Budgets', icon: PiggyBank, roles: ['ACCOUNTANT', 'MANAGER'] },
@@ -54,6 +70,13 @@ export const NAV: NavGroup[] = [
     { href: '/admin/prices', label: 'Price lists', icon: Tags, roles: ['ADMIN'] },
     { href: '/admin/payers', label: 'Payers & schemes', icon: Handshake, roles: ['ADMIN'] },
     { href: '/admin/audit', label: 'Audit log', icon: History, roles: ['ADMIN'] },
+    { href: '/admin/subscription', label: 'Subscription', icon: CreditCard, roles: ['ADMIN'] },
+    { href: '/admin/import', label: 'Import data', icon: Upload, roles: ['ADMIN'] },
+    { href: '/admin/break-glass', label: 'Break-glass review', icon: ShieldAlert, roles: ['ADMIN'] },
+  ] },
+  { label: 'Platform', items: [
+    { href: '/superadmin', label: 'Tenants', icon: Globe, roles: ['__SUPERADMIN__'] },
+    { href: '/superadmin/invoices', label: 'Subscription invoices', icon: Receipt, roles: ['__SUPERADMIN__'] },
   ] },
 ];
 export const ROLES = ['ADMIN','RECEPTION','TRIAGE_NURSE','NURSE','DOCTOR','CLINICAL_OFFICER','LAB_TECH','RADIOGRAPHER','PHARMACIST','CASHIER','CLAIMS_OFFICER','STOREKEEPER','PROCUREMENT','ACCOUNTANT','HR','MANAGER'];

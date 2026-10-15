@@ -58,6 +58,8 @@ services:
       DHIS2_USERNAME: ${DHIS2_USERNAME:-admin}
       DHIS2_PASSWORD: ${DHIS2_PASSWORD:-district}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+      ORTHANC_PUBLIC_URL: ${ORTHANC_PUBLIC_URL:-}
     expose:
       - "4000"
 
@@ -86,6 +88,42 @@ services:
     expose:
       - "4100"
 
+  # ── Optional PACS (enable with: docker compose --profile pacs up -d) ──
+  orthanc:
+    image: orthancteam/orthanc:24.10.3
+    profiles: [pacs]
+    restart: unless-stopped
+    environment:
+      ORTHANC__NAME: JMSURF-PACS
+      ORTHANC__DICOM_AET: JMSURFPACS
+      ORTHANC__DICOM_WEB__ENABLE: "true"
+      ORTHANC__DICOM_WEB__ROOT: /dicom-web/
+      ORTHANC__AUTHENTICATION_ENABLED: "true"
+      ORTHANC__REGISTERED_USERS: '{"${ORTHANC_USER:-orthanc}": "${ORTHANC_PASSWORD:-change-me}"}'
+      ORTHANC__WORKLISTS__ENABLE: "true"
+      ORTHANC__WORKLISTS__DATABASE: /var/lib/orthanc/worklists
+      OHIF_PLUGIN_ENABLED: "true"
+      ORTHANC__OHIF__DATA_SOURCE: dicom-web
+    volumes:
+      - orthancdata:/var/lib/orthanc/db
+      - orthancworklists:/var/lib/orthanc/worklists
+    ports:
+      - "4242:4242" # DICOM (modalities send studies / query worklist here)
+    expose:
+      - "8042"
+
+  ohif:
+    image: ohif/app:v3.9.2
+    profiles: [pacs]
+    restart: unless-stopped
+    depends_on: [orthanc]
+    environment:
+      APP_CONFIG: /usr/share/nginx/html/app-config.js
+    expose:
+      - "80"
+
 volumes:
+  orthancdata:
+  orthancworklists:
   pgdata:
   redisdata:

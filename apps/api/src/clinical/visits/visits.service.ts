@@ -9,6 +9,7 @@ import { NATIONAL_INSURANCE, NationalInsurancePort } from '../../integrations/po
 import { paginate } from '../shared/pagination';
 import { resolveFacilityId } from '../shared/facility';
 import { OpenVisitDto, UpdateVisitDto, VisitQueryDto } from './visits.dto';
+import { decryptNoteFields } from '../../common/field-crypto';
 import { QueueService } from './queue.service';
 
 @Injectable()
@@ -143,7 +144,7 @@ export class VisitsService {
       },
     });
     if (!v) throw new NotFoundException('Visit not found');
-    return v;
+    return { ...v, notes: v.notes.map((n) => decryptNoteFields(n)) };
   }
 
   async update(user: AuthUser, id: string, dto: UpdateVisitDto) {

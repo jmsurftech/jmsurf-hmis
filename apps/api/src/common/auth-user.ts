@@ -7,6 +7,10 @@ export interface AuthUser {
   roles: string[];
   facilityIds: string[];
   isSuperAdmin: boolean;
+  /** Set when a super-admin is impersonating this user (super-admin user id). */
+  impersonatedBy?: string;
+  /** Token purpose; only 'access' tokens authenticate API calls. */
+  typ?: string;
 }
 
 /** Injects the authenticated user (JWT payload). tenantId is always taken from here, never from the request body. */

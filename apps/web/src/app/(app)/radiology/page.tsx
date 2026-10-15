@@ -23,7 +23,10 @@ export default function Radiology() {
         { key: 'a', header: '', render: (o: any) => <span className="flex gap-1">
           {stage === 'REQUESTED,PAID' && <button className="btn-primary py-1 text-xs" onClick={() => start.mutate(o.id)}>Start exam</button>}
           {stage === 'IN_PROGRESS' && <button className="btn-primary py-1 text-xs" onClick={() => setSel(o)}>Report</button>}
-          {stage === 'COMPLETED' && <button className="btn-primary py-1 text-xs" onClick={() => verify.mutate(o.id)}>Verify</button>}</span> },
+          {stage === 'COMPLETED' && <button className="btn-primary py-1 text-xs" onClick={() => verify.mutate(o.id)}>Verify</button>}
+          {o.imagingReport?.studyUid && (o.imagingReport?.viewerUrl
+            ? <a className="btn-secondary py-1 text-xs" href={o.imagingReport.viewerUrl} target="_blank" rel="noreferrer">Open viewer</a>
+            : <span className="text-xs text-slate-400" title="Set ORTHANC_PUBLIC_URL on the API">PACS viewer not configured</span>)}</span> },
       ]} />
       <FormDialog open={!!sel} onClose={() => setSel(null)} title="Radiology report" path={`/radiology/orders/${sel?.id}/report`} invalidate={['/radiology']} success="Report saved" defaults={{ modality: String(sel?.description ?? '').match(/^\[(\w+)\]/)?.[1] ?? 'XR' }} fields={[
         { name: 'modality', label: 'Modality', type: 'select', options: ['XR', 'US', 'CT', 'MRI', 'MAMMO', 'FLUORO', 'ECHO'], required: true }, { name: 'studyUid', label: 'Study UID (PACS)' },

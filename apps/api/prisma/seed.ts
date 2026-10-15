@@ -891,6 +891,7 @@ async function main() {
     });
   }
 
+  await (await import("./seed-clinical2")).seedClinical2(prisma, T, F);
   const counts = {
     services: await prisma.serviceItem.count({ where: { tenantId: T } }), labTests: await prisma.labTest.count({ where: { tenantId: T } }),
     stockItems: await prisma.stockItem.count({ where: { tenantId: T } }), patients: await prisma.patient.count({ where: { tenantId: T } }),
@@ -899,8 +900,18 @@ async function main() {
     employees: await prisma.employee.count({ where: { tenantId: T } }), accounts: await prisma.account.count({ where: { tenantId: T } }),
     journalsCreatedThisRun: journals,
   };
+  // ── Platform super-admin (no tenant)
+  await prisma.user.upsert({
+    where: { email: 'superadmin@jmsurf.health' },
+    update: { isSuperAdmin: true, active: true },
+    create: {
+      email: 'superadmin@jmsurf.health', passwordHash: await bcrypt.hash('Super@1234', 10), firstName: 'Platform', lastName: 'Admin',
+      roles: [], isSuperAdmin: true, tenantId: null,
+    },
+  });
   console.log('Seed complete:', counts);
   console.log(`Login: admin@demo.jmsurf.health / ${PASSWORD} (also doctor@, nurse@, lab@, pharmacy@, cashier@, claims@, store@, accounts@, hr@, reception@, co@, radiology@)`);
+  console.log('Super-admin: superadmin@jmsurf.health / Super@1234');
 }
 
 /** Start of the EAT (UTC+3) calendar day containing `ms`, as a UTC Date. */

@@ -8,13 +8,15 @@ import { news2Score } from './news2';
 import { satsPriority, tewsToCategory } from './sats';
 import { searchIcd11, ICD11_CODES } from './icd11-codes';
 import { processSpecialtyForm } from './specialty-forms';
+import { decryptNoteFields, encryptNoteFields } from '../../common/field-crypto';
+import { BreakGlassService } from '../../platform/break-glass';
 import { DiagnosisDto, NoteDto, SENSITIVE_SPECIALTIES, TriageDto, UpdateNoteDto, VitalsDto } from './emr.dto';
 
 const SENSITIVE_ROLES = ['DOCTOR', 'CLINICAL_OFFICER'];
 
 @Injectable()
 export class EmrService {
-  constructor(private prisma: PrismaService, private audit: AuditService, private visits: VisitsService, private queue: QueueService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private visits: VisitsService, private queue: QueueService, private breakGlass: BreakGlassService) {}
 
   canSeeSensitive(user: AuthUser) {
     return user.isSuperAdmin || user.roles.includes('ADMIN') || user.roles.some((r) => SENSITIVE_ROLES.includes(r));
@@ -65,30 +67,38 @@ export class EmrService {
     if (sensitive && !this.canSeeSensitive(user)) throw new ForbiddenException('Only clinicians may record restricted notes');
     const data = processSpecialtyForm(dto.specialty, dto.data);
     const note = await this.prisma.clinicalNote.create({
-      data: {
+      data: encryptNoteFields({
         tenantId: user.tenantId, visitId: v.id, type: dto.type ?? (dto.specialty && dto.specialty !== 'GENERAL' ? 'SPECIALTY' : 'SOAP'), specialty: dto.specialty,
         subjective: dto.subjective, objective: dto.objective, assessment: dto.assessment, plan: dto.plan, data: data as any,
         sensitive, aiDrafted: dto.aiDrafted ?? false, authorId: user.sub, signedAt: dto.sign ? new Date() : null,
-      },
+      }, sensitive),
     });
     if (v.status === 'OPEN') await this.prisma.visit.update({ where: { id: v.id }, data: { status: 'IN_PROGRESS' } });
     if (sensitive) await this.audit.log({ tenantId: user.tenantId, userId: user.sub, action: 'CREATE_SENSITIVE', entity: 'ClinicalNote', entityId: note.id });
-    return note;
+    return decryptNoteFields(note);
+  }
+
+  /** Clinician roles, or anyone holding an active break-glass grant for the visit's patient. */
+  private async canSeeSensitiveFor(user: AuthUser, visitId: string) {
+    if (this.canSeeSensitive(user)) return { see: true, breakGlass: false };
+    const v = await this.prisma.visit.findFirst({ where: { id: visitId, tenantId: user.tenantId }, select: { patientId: true } });
+    const bg = !!v && (await this.breakGlass.hasActive(user.tenantId, user.sub, v.patientId));
+    return { see: bg, breakGlass: bg };
   }
 
   async listNotes(user: AuthUser, visitId: string) {
-    const see = this.canSeeSensitive(user);
     const notes = await this.prisma.clinicalNote.findMany({ where: { tenantId: user.tenantId, visitId }, orderBy: { createdAt: 'desc' } });
-    const visible = notes.filter((n) => see || !n.sensitive);
+    const { see, breakGlass } = notes.some((n) => n.sensitive) ? await this.canSeeSensitiveFor(user, visitId) : { see: true, breakGlass: false };
+    const visible = notes.filter((n) => see || !n.sensitive).map((n) => decryptNoteFields(n));
     if (see && notes.some((n) => n.sensitive))
-      await this.audit.log({ tenantId: user.tenantId, userId: user.sub, action: 'READ_SENSITIVE', entity: 'ClinicalNote', data: { visitId } });
+      await this.audit.log({ tenantId: user.tenantId, userId: user.sub, action: breakGlass ? 'READ_SENSITIVE_BREAK_GLASS' : 'READ_SENSITIVE', entity: 'ClinicalNote', data: { visitId } });
     return { data: visible, hiddenSensitive: notes.length - visible.length };
   }
 
   private async noteFor(user: AuthUser, id: string) {
     const n = await this.prisma.clinicalNote.findFirst({ where: { id, tenantId: user.tenantId } });
     if (!n) throw new NotFoundException('Note not found');
-    if (n.sensitive && !this.canSeeSensitive(user)) throw new ForbiddenException('Restricted note');
+    if (n.sensitive && !(await this.canSeeSensitiveFor(user, n.visitId)).see) throw new ForbiddenException('Restricted note');
     return n;
   }
 
@@ -97,7 +107,8 @@ export class EmrService {
     if (n.signedAt) throw new BadRequestException('Signed notes cannot be edited; add an addendum note instead');
     if (n.authorId && n.authorId !== user.sub && !user.roles.includes('ADMIN')) throw new ForbiddenException('Only the author can edit this note');
     const data = dto.data ? processSpecialtyForm(n.specialty ?? undefined, dto.data) : undefined;
-    return this.prisma.clinicalNote.update({ where: { id }, data: { ...dto, data: data as any } });
+    const updated = await this.prisma.clinicalNote.update({ where: { id }, data: encryptNoteFields({ ...dto, data: data as any }, n.sensitive) });
+    return decryptNoteFields(updated);
   }
 
   async signNote(user: AuthUser, id: string) {
@@ -105,7 +116,7 @@ export class EmrService {
     if (n.signedAt) throw new BadRequestException('Already signed');
     const r = await this.prisma.clinicalNote.update({ where: { id }, data: { signedAt: new Date() } });
     await this.audit.log({ tenantId: user.tenantId, userId: user.sub, action: 'SIGN', entity: 'ClinicalNote', entityId: id });
-    return r;
+    return decryptNoteFields(r);
   }
 
   // ── Diagnoses ──

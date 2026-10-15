@@ -9,7 +9,9 @@ import { NAV } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { CommandPalette } from './CommandPalette';
+import { PlatformBanners } from './Security';
 import { Loading } from './ui';
+import { OfflineIndicator } from './OfflineIndicator';
 
 export function Logo({ className }: { className?: string }) {
   return <span className={cn('flex items-center gap-2 font-semibold', className)}><span className="rounded-lg bg-gradient-to-br from-primary-500 to-brand-blue p-1.5 text-white"><HeartPulse className="h-4 w-4" /></span>JMSURF <span className="text-primary-600 dark:text-primary-400">HMIS</span></span>;
@@ -34,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobile, setMobile] = useState(false); const [palette, setPalette] = useState(false);
   useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(path)}`); }, [loading, user, router, path]);
   useEffect(() => setMobile(false), [path]);
-  const groups = useMemo(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole]);
+  const groups = useMemo(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.roles?.includes('__SUPERADMIN__') ? !!user?.isSuperAdmin : !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole, user]);
   if (loading || !user) return <div className="flex h-screen items-center justify-center"><Loading /></div>;
 
   const isActive = (href: string) => href === '/admin' ? path === '/admin' : path === href || path.startsWith(href + '/');
@@ -55,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </div>
       <div className="border-t border-slate-200 p-3 text-xs dark:border-slate-800">
-        <p className="font-medium">{user.firstName} {user.lastName}</p>
+        <Link href="/profile" className="font-medium hover:underline">{user.firstName} {user.lastName}</Link>
         <p className="truncate text-slate-500">{user.roles.join(', ')}</p>
       </div>
     </nav>
@@ -71,11 +73,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Search className="h-4 w-4" /><span className="flex-1 truncate">Search patients…</span><kbd className="hidden rounded border px-1.5 text-[10px] sm:inline dark:border-slate-700">Ctrl K</kbd>
           </button>
           <div className="ml-auto flex items-center gap-2">
+            <OfflineIndicator />
             <span className="hidden md:block"><FacilitySwitcher /></span>
             <button className="btn-secondary px-2" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
             <button className="btn-secondary px-2" onClick={logout} aria-label="Log out"><LogOut className="h-4 w-4" /></button>
           </div>
         </header>
+        <PlatformBanners />
         <main className="flex-1 p-3 sm:p-6">{children}</main>
       </div>
       <CommandPalette open={palette} setOpen={setPalette} />

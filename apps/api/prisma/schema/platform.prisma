@@ -1,0 +1,56 @@
+// JMSURF HMIS — platform: security (refresh tokens, break-glass) and SaaS billing.
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tenantId   String?
+  tokenHash  String    @unique // sha256 of the opaque token
+  familyId   String // rotation family; reuse of a revoked token revokes the whole family
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model BreakGlassGrant {
+  id         String    @id @default(uuid())
+  tenantId   String
+  userId     String
+  patientId  String?
+  reason     String
+  expiresAt  DateTime
+  reviewedAt DateTime?
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, userId, expiresAt])
+  @@index([tenantId, reviewedAt])
+}
+
+model SubscriptionInvoice {
+  id                String    @id @default(uuid())
+  tenantId          String
+  number            String    @unique
+  period            String // YYYY-MM
+  plan              String
+  baseMinor         Int
+  visits            Int       @default(0)
+  perVisitMinor     Int       @default(0)
+  amountMinor       Int
+  currency          String    @default("KES")
+  status            String    @default("UNPAID") // UNPAID, PENDING, PAID, VOID
+  dueDate           DateTime
+  paidAt            DateTime?
+  paymentRef        String?
+  checkoutRequestId String?
+  createdAt         DateTime  @default(now())
+
+  @@unique([tenantId, period])
+  @@index([status, dueDate])
+}
