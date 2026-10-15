@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PatientsModule } from './patients/patients.module';
 import { VisitsModule } from './visits/visits.module';
+import { TelemedicineModule } from './telemedicine/telemedicine.module';
 import { EmrModule } from './emr/emr.module';
 import { OrdersModule } from './orders/orders.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -14,7 +15,7 @@ import { RegistersModule } from './registers/registers.module';
 
 // Aggregator module: import every clinical sub-module here.
 @Module({
-  imports: [
+  imports: [TelemedicineModule, 
     PatientsModule, VisitsModule, EmrModule, OrdersModule, InventoryModule, PharmacyModule,
     InpatientModule, MaternityModule, TheatreModule, DialysisModule, HomecareModule, RegistersModule,
   ],

@@ -286,6 +286,7 @@ model Appointment {
   status         String   @default("BOOKED") // BOOKED, CONFIRMED, ARRIVED, NO_SHOW, CANCELLED, DONE
   reason         String?
   meetingUrl     String?
+  visitId        String? // set at check-in (telemedicine: when the patient prepares to pay or the clinician starts)
   createdAt      DateTime @default(now())
 
   @@index([tenantId, startAt])

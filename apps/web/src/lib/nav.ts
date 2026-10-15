@@ -1,7 +1,7 @@
 import {
   Activity, BarChart3, Baby, BedDouble, Building2, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, Droplets, FileCheck2,
   FileText, FlaskConical, HeartPulse, Home, LayoutDashboard, ListOrdered, Package, Pill, Receipt, ScanLine, Scissors, Settings,
-  ShieldAlert, ShoppingCart, Stethoscope, Users, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
+  ShieldAlert, ShoppingCart, Stethoscope, Users, Video, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
 } from 'lucide-react';
 import { REGISTERS } from './registers';
 
@@ -27,6 +27,7 @@ const BASE: NavGroup[] = [
     { href: '/theatre', label: 'Theatre', icon: Scissors, roles: ['DOCTOR', 'NURSE'] },
     { href: '/dialysis', label: 'Dialysis', icon: Droplets, roles: ['DOCTOR', 'NURSE'] },
     { href: '/homecare', label: 'Homecare', icon: Home, roles: ['DOCTOR', 'NURSE', 'CLINICAL_OFFICER'] },
+    { href: '/telemedicine', label: 'Telemedicine', icon: Video, roles: [...CLIN, 'RECEPTION'] },
   ] },
   { label: 'Revenue', items: [
     { href: '/billing', label: 'Billing', icon: Receipt, roles: ['CASHIER', 'RECEPTION', 'ACCOUNTANT', 'CLAIMS_OFFICER'] },

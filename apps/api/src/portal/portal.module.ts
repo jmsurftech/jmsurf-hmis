@@ -16,6 +16,11 @@ import { withTenant } from '../integrations/integration-context';
 import { PaymentsModule } from '../revenue/payments/payments.module';
 import { PaymentsService } from '../revenue/payments/payments.service';
 import { TenantStatusCache } from '../platform/platform.module';
+import { VisitsModule } from '../clinical/visits/visits.module';
+import { VisitsService } from '../clinical/visits/visits.service';
+import { joinWindowOpen, videoEmbeddable, videoRoomUrl } from '../clinical/telemedicine/video';
+import { visitBalance } from '../clinical/telemedicine/telemedicine.module';
+import type { AuthUser } from '../common/auth-user';
 
 /** Portal tokens are signed with a different secret from staff tokens, so neither can be used as the other. */
 const PORTAL_SECRET = () => `${process.env.JWT_SECRET || 'dev-secret'}::patient-portal`;
@@ -71,7 +76,7 @@ export class PortalService {
   private log = new Logger('Portal');
   constructor(
     private prisma: PrismaService, private jwt: JwtService, private audit: AuditService, private mail: MailService,
-    private payments: PaymentsService, @Inject(SMS) private sms: SmsPort,
+    private payments: PaymentsService, private visitsSvc: VisitsService, @Inject(SMS) private sms: SmsPort,
   ) {}
 
   private matchWhere(id: { kind: 'phone' | 'email'; value: string }) {
@@ -178,7 +183,8 @@ export class PortalService {
       this.prisma.facility.findMany({ where: { tenantId: p.tenantId }, select: { id: true, name: true } }),
       this.prisma.department.findMany({ where: { tenantId: p.tenantId }, select: { id: true, name: true } }),
     ]);
-    return rows.map((a) => ({ ...a, facility: fac.find((f) => f.id === a.facilityId)?.name, department: dep.find((d) => d.id === a.departmentId)?.name }));
+    // The room link is only handed out by consult() once the fee is paid.
+    return rows.map(({ meetingUrl, ...a }) => ({ ...a, facility: fac.find((f) => f.id === a.facilityId)?.name, department: dep.find((d) => d.id === a.departmentId)?.name }));
   }
   async book(p: PortalUser, dto: BookDto) {
     const start = new Date(dto.startAt);
@@ -191,7 +197,7 @@ export class PortalService {
     if (open >= 3) throw new BadRequestException('You already have three upcoming bookings. Cancel one to book another.');
     const a = await this.prisma.appointment.create({
       data: { tenantId: p.tenantId, facilityId: fac.id, patientId: p.sub, departmentId: dto.departmentId, startAt: start, endAt: new Date(start.getTime() + 30 * 60_000),
-        mode: dto.mode ?? 'IN_PERSON', status: 'BOOKED', reason: dto.reason?.trim() ? `${dto.reason.trim()} (booked online)` : 'Booked online' },
+        mode: dto.mode ?? 'IN_PERSON', status: 'BOOKED', meetingUrl: dto.mode === 'TELEMEDICINE' ? videoRoomUrl() : undefined, reason: dto.reason?.trim() ? `${dto.reason.trim()} (booked online)` : 'Booked online' },
     });
     await this.audit.log({ tenantId: p.tenantId, action: 'PORTAL_BOOK', entity: 'Appointment', entityId: a.id });
     return a;
@@ -202,6 +208,31 @@ export class PortalService {
     if (!['BOOKED', 'CONFIRMED'].includes(a.status)) throw new BadRequestException('This booking can no longer be cancelled');
     await this.audit.log({ tenantId: p.tenantId, action: 'PORTAL_CANCEL', entity: 'Appointment', entityId: id });
     return this.prisma.appointment.update({ where: { id }, data: { status: 'CANCELLED' } });
+  }
+
+  /** A video consult as the patient sees it. The room link is only given once the fee is paid and the join window is open. */
+  async consult(p: PortalUser, id: string) {
+    const a = await this.prisma.appointment.findFirst({ where: { id, tenantId: p.tenantId, patientId: p.sub, mode: 'TELEMEDICINE' } });
+    if (!a) throw new NotFoundException('Video consult not found');
+    const payment = await visitBalance(this.prisma, p.tenantId, a.visitId);
+    const paid = !!a.visitId && (payment?.dueMinor ?? 0) <= 0;
+    const open = joinWindowOpen(a) && ['BOOKED', 'CONFIRMED', 'ARRIVED'].includes(a.status);
+    const pr = a.practitionerId ? await this.prisma.practitioner.findFirst({ where: { id: a.practitionerId }, select: { user: { select: { firstName: true, lastName: true } } } }) : null;
+    return { id: a.id, startAt: a.startAt, endAt: a.endAt, status: a.status, reason: a.reason, practitioner: pr?.user ?? null, prepared: !!a.visitId, payment, paid, open, meetingUrl: paid && open ? a.meetingUrl : null, embed: videoEmbeddable(), ended: ['DONE', 'CANCELLED', 'NO_SHOW'].includes(a.status) };
+  }
+
+  /** Opens the visit for a video consult so the consultation fee is billed and can be paid by M-Pesa. */
+  async prepareConsult(p: PortalUser, id: string) {
+    const a = await this.prisma.appointment.findFirst({ where: { id, tenantId: p.tenantId, patientId: p.sub, mode: 'TELEMEDICINE' } });
+    if (!a) throw new NotFoundException('Video consult not found');
+    if (!['BOOKED', 'CONFIRMED'].includes(a.status) && !a.visitId) throw new BadRequestException('This consult can no longer be paid for');
+    if (!a.visitId) {
+      const sys: AuthUser = { sub: 'PATIENT_PORTAL', tenantId: p.tenantId, email: '', roles: [], facilityIds: [a.facilityId], isSuperAdmin: false };
+      const visit = await this.visitsSvc.open(sys, { patientId: a.patientId, facilityId: a.facilityId, practitionerId: a.practitionerId ?? undefined, departmentId: a.departmentId ?? undefined, type: 'TELEMEDICINE' as any, queueAt: 'NONE' });
+      await this.prisma.appointment.update({ where: { id }, data: { visitId: visit.id, status: 'CONFIRMED', meetingUrl: a.meetingUrl ?? videoRoomUrl() } });
+      await this.audit.log({ tenantId: p.tenantId, action: 'PORTAL_TELEMEDICINE_PREPARE', entity: 'Appointment', entityId: id, data: { visitId: visit.id } });
+    }
+    return this.consult(p, id);
   }
 
   /** Only verified results are shown to patients. */
@@ -286,6 +317,8 @@ export class PortalController {
   @Get('appointments') appointments(@Patient() p: PortalUser) { return this.svc.appointments(p); }
   @Post('appointments') book(@Patient() p: PortalUser, @Body() dto: BookDto) { return this.svc.book(p, dto); }
   @Post('appointments/:id/cancel') cancel(@Patient() p: PortalUser, @Param('id') id: string) { return this.svc.cancel(p, id); }
+  @Get('consults/:id') consult(@Patient() p: PortalUser, @Param('id') id: string) { return this.svc.consult(p, id); }
+  @Post('consults/:id/prepare') prepare(@Patient() p: PortalUser, @Param('id') id: string) { return this.svc.prepareConsult(p, id); }
   @Get('results') results(@Patient() p: PortalUser) { return this.svc.results(p); }
   @Get('prescriptions') prescriptions(@Patient() p: PortalUser) { return this.svc.prescriptions(p); }
   @Get('bills') bills(@Patient() p: PortalUser) { return this.svc.bills(p); }
@@ -299,7 +332,7 @@ export class PortalController {
 }
 
 @Module({
-  imports: [JwtModule.register({}), PaymentsModule],
+  imports: [JwtModule.register({}), PaymentsModule, VisitsModule],
   controllers: [PortalAuthController, PortalController],
   providers: [PortalService, PortalGuard],
 })

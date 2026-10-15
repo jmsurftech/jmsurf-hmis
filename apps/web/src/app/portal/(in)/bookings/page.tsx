@@ -1,5 +1,6 @@
 'use client';
 import { CalendarDays, CalendarPlus, Video, X } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Card, EmptyState, ErrorNote, Field, Loading, Modal, PageHeader, Seg, StatusBadge } from '@/components/ui';
 import { useConfirm } from '@/components/Toast';
@@ -39,7 +40,7 @@ export default function Bookings() {
     <li className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
       <span className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand/10 text-brand">{a.mode === 'TELEMEDICINE' ? <Video className="h-5 w-5" /> : <CalendarDays className="h-5 w-5" />}</span>
         <span className="min-w-0"><b className="block">{dateTime(a.startAt)}</b><small className="block truncate text-slate-500">{[a.department ?? 'General outpatient', a.facility, a.mode === 'TELEMEDICINE' ? 'Video call' : null].filter(Boolean).join(' · ')}</small></span></span>
-      <span className="flex items-center gap-2"><StatusBadge status={a.status} />{a.meetingUrl && <a className="btn sm primary" href={a.meetingUrl} target="_blank" rel="noreferrer"><Video />Join</a>}
+      <span className="flex items-center gap-2"><StatusBadge status={a.status} />{a.mode === 'TELEMEDICINE' && ['BOOKED', 'CONFIRMED', 'ARRIVED'].includes(a.status) && <Link className="btn sm primary" href={`/portal/consult/${a.id}`}><Video />Open video visit</Link>}
         {canCancel && <button className="btn sm" onClick={async () => { if (await confirm({ title: 'Cancel this booking?', confirm: 'Cancel booking' })) cancel.mutate(a.id); }}><X />Cancel</button>}</span>
     </li>
   );

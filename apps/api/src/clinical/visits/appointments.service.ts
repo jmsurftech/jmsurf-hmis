@@ -5,6 +5,7 @@ import { AuthUser } from '../../common/auth-user';
 import { resolveFacilityId } from '../shared/facility';
 import { CalendarQueryDto, CheckInDto, CreateAppointmentDto, UpdateAppointmentDto } from './visits.dto';
 import { VisitsService } from './visits.service';
+import { videoRoomUrl } from '../telemedicine/video';
 
 @Injectable()
 export class AppointmentsService {
@@ -26,7 +27,8 @@ export class AppointmentsService {
     const startAt = new Date(dto.startAt), endAt = new Date(dto.endAt);
     await this.assertFree(t, dto.practitionerId, startAt, endAt);
     const facilityId = await resolveFacilityId(this.prisma, user, dto.facilityId);
-    return this.prisma.appointment.create({ data: { ...dto, facilityId, startAt, endAt, tenantId: t } });
+    const meetingUrl = dto.mode === 'TELEMEDICINE' ? (dto as any).meetingUrl ?? videoRoomUrl() : (dto as any).meetingUrl;
+    return this.prisma.appointment.create({ data: { ...dto, meetingUrl, facilityId, startAt, endAt, tenantId: t } });
   }
 
   async get(tenantId: string, id: string) {
@@ -74,7 +76,7 @@ export class AppointmentsService {
       patientId: a.patientId, facilityId: a.facilityId, practitionerId: a.practitionerId ?? undefined, departmentId: a.departmentId ?? undefined,
       type: a.mode === 'TELEMEDICINE' ? ('TELEMEDICINE' as any) : ('OPD' as any), ...dto,
     });
-    await this.prisma.appointment.update({ where: { id }, data: { status: 'ARRIVED' } });
+    await this.prisma.appointment.update({ where: { id }, data: { status: 'ARRIVED', visitId: visit.id } });
     return visit;
   }
 
