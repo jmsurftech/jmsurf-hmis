@@ -33,6 +33,10 @@ export class OrdersService {
         if (!test) throw new NotFoundException('Lab test not found');
         serviceId ??= test.serviceItemId ?? undefined;
         description ??= `${test.code}: ${test.name}`;
+      } else if (!description) {
+        // Ordered by service item: keep the "CODE: name" description the lab worklist relies on.
+        const test = await this.prisma.labTest.findFirst({ where: { tenantId: t, serviceItemId: serviceId } });
+        if (test) description = `${test.code}: ${test.name}`;
       }
     }
     if (!serviceId) throw new BadRequestException('serviceId is required so the order can be billed');

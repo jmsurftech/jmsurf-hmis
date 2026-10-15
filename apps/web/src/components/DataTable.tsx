@@ -40,7 +40,10 @@ export function DataTable<T = any>({ path, columns, query = {}, onRowClick, sear
   const dq = useDebounced(q);
   useEffect(() => setPage(1), [dq, JSON.stringify(query)]);
   const { data, isLoading, error, isFetching } = useList<T>(path, { ...query, q: dq, page, pageSize });
-  const total = data?.total ?? 0; const pages = Math.max(1, Math.ceil(total / pageSize));
+  // Endpoints returning bare arrays are searched and paged in the browser.
+  const all = data?.clientSide && dq ? (data.data ?? []).filter((r) => JSON.stringify(r).toLowerCase().includes(dq.toLowerCase())) : data?.data ?? [];
+  const rows = data?.clientSide ? all.slice((page - 1) * pageSize, page * pageSize) : all;
+  const total = data?.clientSide ? all.length : data?.total ?? 0; const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="card overflow-hidden">
       {(searchable || toolbar) && (
@@ -57,7 +60,7 @@ export function DataTable<T = any>({ path, columns, query = {}, onRowClick, sear
       )}
       {error ? <div className="p-3"><ErrorNote error={error} /></div> : null}
       {isLoading ? <div className="flex justify-center p-10"><Spinner className="h-6 w-6 text-slate-400" /></div> : (
-        <Table columns={columns} rows={data?.data ?? []} onRowClick={onRowClick} empty={<EmptyState message={emptyMessage} />} />
+        <Table columns={columns} rows={rows} onRowClick={onRowClick} empty={<EmptyState message={emptyMessage} />} />
       )}
       <div className="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
         <span>{total} record{total === 1 ? '' : 's'}</span>

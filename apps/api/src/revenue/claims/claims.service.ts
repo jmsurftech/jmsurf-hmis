@@ -33,7 +33,23 @@ export class ClaimsService {
       this.prisma.claim.findMany({ where, orderBy: { createdAt: 'desc' }, ...pageArgs(q) }),
       this.prisma.claim.count({ where }),
     ]);
-    return paged(data, total, q);
+    return paged(await this.withContext(tenantId, data), total, q);
+  }
+
+  /** Attach visit/patient and payer summaries (Claim stores only the ids). */
+  private async withContext<T extends { visitId: string; payerId: string }>(tenantId: string, claims: T[]) {
+    const [visits, payers] = await Promise.all([
+      this.prisma.visit.findMany({ where: { tenantId, id: { in: claims.map((c) => c.visitId) } }, select: { id: true, visitNumber: true, payerType: true, patient: { select: { id: true, mrn: true, firstName: true, lastName: true, shaNumber: true } } } }),
+      this.prisma.payer.findMany({ where: { tenantId, id: { in: claims.map((c) => c.payerId) } }, select: { id: true, name: true, type: true } }),
+    ]);
+    const vm = new Map(visits.map((v) => [v.id, v])); const pm = new Map(payers.map((p) => [p.id, p]));
+    return claims.map((c) => ({ ...c, visit: vm.get(c.visitId) ?? null, patient: vm.get(c.visitId)?.patient ?? null, payer: pm.get(c.payerId) ?? null }));
+  }
+
+  /** Claim with lines, events and visit/patient/payer context, for the claim detail view. */
+  async getDetail(tenantId: string, id: string) {
+    const [c] = await this.withContext(tenantId, [await this.get(tenantId, id)]);
+    return c;
   }
 
   async get(tenantId: string, id: string) {

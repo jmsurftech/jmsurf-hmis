@@ -2,7 +2,8 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000
 const TOKEN_KEY = 'jmsurf.token';
 const FACILITY_KEY = 'jmsurf.facility';
 
-export interface Paginated<T> { data: T[]; total: number; page: number; pageSize: number }
+/** List envelope. `clientSide` is set when the endpoint returned a bare array (no server paging/search). */
+export interface Paginated<T> { data: T[]; total: number; page: number; pageSize: number; clientSide?: boolean }
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) { super(message); }

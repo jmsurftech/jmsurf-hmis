@@ -6,7 +6,7 @@ import { money } from '@/lib/format';
 import { Field, Spinner } from './ui';
 
 type Status = 'idle' | 'sending' | 'PENDING' | 'SUCCESS' | 'FAILED';
-/** M-Pesa STK push with status polling. POST {initPath} → {id|checkoutRequestId}; GET /payments/mpesa/{id} → {status}. */
+/** M-Pesa STK push with status polling. POST /payments/mpesa/stk → Payment (PENDING); GET /payments/{id} → { status, reference }. */
 export function MpesaStk({ amountMinor, initPath = '/payments/mpesa/stk', body, defaultPhone, onSuccess }: { amountMinor: number; initPath?: string; body: Record<string, unknown>; defaultPhone?: string | null; onSuccess?: (r: any) => void }) {
   const [phone, setPhone] = useState(defaultPhone ?? ''); const [status, setStatus] = useState<Status>('idle'); const [id, setId] = useState(''); const [msg, setMsg] = useState('');
   useEffect(() => {
@@ -15,9 +15,9 @@ export function MpesaStk({ amountMinor, initPath = '/payments/mpesa/stk', body, 
     const t = setInterval(async () => {
       n++;
       try {
-        const r = await api.get<{ status: string; receipt?: string; message?: string }>(`/payments/mpesa/${id}`);
-        if (r.status === 'SUCCESS' || r.status === 'COMPLETED') { setStatus('SUCCESS'); setMsg(r.receipt ? `Receipt ${r.receipt}` : ''); clearInterval(t); onSuccess?.(r); }
-        else if (r.status === 'FAILED' || r.status === 'CANCELLED') { setStatus('FAILED'); setMsg(r.message ?? 'Payment failed or cancelled'); clearInterval(t); }
+        const r = await api.get<{ status: string; reference?: string; receiptNumber?: string; providerData?: any }>(`/payments/${id}`);
+        if (r.status === 'SUCCESS' || r.status === 'COMPLETED') { setStatus('SUCCESS'); setMsg(r.reference ? `M-Pesa ref ${r.reference}` : ''); clearInterval(t); onSuccess?.(r); }
+        else if (r.status === 'FAILED' || r.status === 'CANCELLED') { setStatus('FAILED'); setMsg(r.providerData?.failure ?? 'Payment failed or cancelled'); clearInterval(t); }
       } catch { /* keep polling */ }
       if (n > 40) { setStatus('FAILED'); setMsg('Timed out waiting for confirmation'); clearInterval(t); }
     }, 3000);
@@ -25,7 +25,7 @@ export function MpesaStk({ amountMinor, initPath = '/payments/mpesa/stk', body, 
   }, [status, id]); // eslint-disable-line
   const send = async () => {
     setStatus('sending'); setMsg('');
-    try { const r = await api.post<{ id?: string; checkoutRequestId?: string }>(initPath, { ...body, phone, amountMinor }); setId(r.id ?? r.checkoutRequestId ?? ''); setStatus('PENDING'); }
+    try { const r = await api.post<{ id: string }>(initPath, { ...body, phone, amountMinor: amountMinor >= 100 ? amountMinor : undefined }); setId(r.id); setStatus('PENDING'); }
     catch (e) { setStatus('FAILED'); setMsg((e as Error).message); }
   };
   return (

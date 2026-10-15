@@ -16,8 +16,8 @@ export function Logo({ className }: { className?: string }) {
 }
 
 function FacilitySwitcher() {
-  const { facilityId, setFacility, user } = useAuth();
-  const { data } = useList<any>('/facilities', { pageSize: 100 });
+  const { facilityId, setFacility, user, hasRole } = useAuth();
+  const { data } = useList<any>('/admin/facilities', {}, hasRole('MANAGER'));
   const list = (data?.data ?? []).filter((f: any) => !user?.facilityIds?.length || user.facilityIds.includes(f.id) || user.roles.includes('ADMIN'));
   if (!list.length) return null;
   return (

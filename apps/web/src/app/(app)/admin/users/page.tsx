@@ -13,8 +13,8 @@ export default function Users() {
       { key: 'name', header: 'Name', render: (u: any) => `${u.firstName} ${u.lastName}` }, { key: 'email', header: 'Email' },
       { key: 'roles', header: 'Roles', render: (u: any) => <div className="flex flex-wrap gap-1">{(u.roles ?? []).map((r: string) => <StatusBadge key={r} status={r} tone="blue" />)}</div> },
       { key: 'lastLoginAt', header: 'Last login', render: (u: any) => date(u.lastLoginAt) }, { key: 'active', header: 'Status', render: (u: any) => <StatusBadge status={u.active === false ? 'INACTIVE' : 'ACTIVE'} /> }]}
-      transform={(v) => ({ ...v, roles: v.role ? [v.role] : [] })}
-      fields={[{ name: 'firstName', label: 'First name', required: true }, { name: 'lastName', label: 'Last name', required: true }, { name: 'email', label: 'Email', type: 'email', required: true }, { name: 'phone', label: 'Phone' }, { name: 'role', label: 'Primary role', type: 'select', options: ROLES, required: true }, { name: 'password', label: 'Temporary password', type: 'password', required: true }]} />
+      transform={(v) => ({ firstName: v.firstName, lastName: v.lastName, email: v.email, phone: v.phone, roles: v.role ? [v.role] : [] })} onCreated={(r: any) => r?.temporaryPassword && alert(`User created. Temporary password: ${r.temporaryPassword}`)}
+      fields={[{ name: 'firstName', label: 'First name', required: true }, { name: 'lastName', label: 'Last name', required: true }, { name: 'email', label: 'Email', type: 'email', required: true }, { name: 'phone', label: 'Phone' }, { name: 'role', label: 'Primary role', type: 'select', options: ROLES, required: true }]} />
     {sel && <RolesDialog user={sel} onClose={() => setSel(null)} />}
   </>;
 }

@@ -5,17 +5,17 @@ import { DataTable, type Column } from './DataTable';
 import { FormDialog, type FieldDef } from './FormDialog';
 import { PageHeader } from './ui';
 
-export function CrudPage<T = any>({ title, subtitle, path, columns, fields, createLabel = 'New', createPath, query, onRowClick, actions, toolbar, transform, children }: {
+export function CrudPage<T = any>({ title, subtitle, path, columns, fields, createLabel = 'New', createPath, query, onRowClick, actions, toolbar, transform, children, searchable, onCreated }: {
   title: string; subtitle?: string; path: string; columns: Column<T>[]; fields?: FieldDef[]; createLabel?: string; createPath?: string;
-  query?: Record<string, any>; onRowClick?: (r: T) => void; actions?: React.ReactNode; toolbar?: React.ReactNode; transform?: (v: any) => any; children?: React.ReactNode;
+  query?: Record<string, any>; onRowClick?: (r: T) => void; actions?: React.ReactNode; toolbar?: React.ReactNode; transform?: (v: any) => any; children?: React.ReactNode; searchable?: boolean; onCreated?: (r: any) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} actions={<>{actions}{fields && <button className="btn-primary" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{createLabel}</button>}</>} />
       {children}
-      <DataTable path={path} columns={columns} query={query} onRowClick={onRowClick} toolbar={toolbar} />
-      {fields && <FormDialog open={open} onClose={() => setOpen(false)} title={createLabel} fields={fields} path={createPath ?? path} invalidate={[path]} transform={transform} />}
+      <DataTable path={path} columns={columns} query={query} onRowClick={onRowClick} toolbar={toolbar} searchable={searchable} />
+      {fields && <FormDialog open={open} onClose={() => setOpen(false)} title={createLabel} fields={fields} path={createPath ?? path} invalidate={[path]} transform={transform} onDone={onCreated} />}
     </div>
   );
 }

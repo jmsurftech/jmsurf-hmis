@@ -18,7 +18,7 @@ export class RadiologyService {
 
   worklist(tenantId: string, q: WorklistQueryDto) {
     const where: Prisma.OrderWhereInput = {
-      tenantId, type: 'IMAGING', status: q.status ? (q.status as any) : { in: ['REQUESTED', 'PAID', 'IN_PROGRESS', 'COMPLETED'] },
+      tenantId, type: 'IMAGING', status: q.status ? { in: q.status.split(',') as any } : { in: ['REQUESTED', 'PAID', 'IN_PROGRESS', 'COMPLETED'] },
       ...(q.priority ? { priority: q.priority } : {}),
       ...(q.q ? { OR: [{ description: { contains: q.q, mode: 'insensitive' } }, { visit: { patient: { mrn: { contains: q.q, mode: 'insensitive' } } } }] } : {}),
     };

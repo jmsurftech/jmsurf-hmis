@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Card, Field, PageHeader, Spinner } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 const ID_TYPES = ['NATIONAL_ID', 'MAISHA_NAMBA', 'PASSPORT', 'BIRTH_CERT', 'ALIEN_ID', 'REFUGEE_ID'];
 const schema = z.object({
@@ -30,16 +30,29 @@ export default function NewPatient() {
     if (!idNumber) return toast.push('Enter an ID number first', 'error');
     setLooking(true);
     try {
-      const r = await api.get<Partial<F> & { dateOfBirth?: string }>('/patients/registry-lookup', { idType, idNumber });
-      (Object.keys(r) as (keyof F)[]).forEach((k) => { const v = r[k]; if (v != null && k in schema.shape) setValue(k, (k === 'dateOfBirth' ? String(v).slice(0, 10) : v) as any); });
+      const res = await api.post<{ registry: Partial<F> & { found: boolean; dateOfBirth?: string }; localPatient?: { id: string; mrn: string } | null }>('/patients/client-registry/lookup', { idType, idNumber });
+      if (res.localPatient) { toast.push(`Already registered as ${res.localPatient.mrn}`, 'info'); router.push(`/patients/${res.localPatient.id}`); return; }
+      const r = res.registry;
+      if (!r?.found) { toast.push('Not found in Client Registry', 'error'); return; }
+      (Object.keys(r) as (keyof F)[]).forEach((k) => { const v = r[k]; if (v != null && k in schema.shape) setValue(k, (k === 'dateOfBirth' ? String(v).slice(0, 10) : k === 'sex' ? String(v).toUpperCase() : v) as any); });
       toast.push('Prefilled from Client Registry', 'success');
     } catch (e) { toast.push((e as Error).message || 'Not found in Client Registry', 'error'); } finally { setLooking(false); }
   };
   const submit = handleSubmit(async ({ nokName, nokRelationship, nokPhone, ...v }) => {
     const body: Record<string, unknown> = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== '' && x !== undefined));
     if (nokName) body.nextOfKin = [{ name: nokName, relationship: nokRelationship, phone: nokPhone }];
-    try { const p = await api.post<{ id: string }>('/patients', body); toast.push('Patient registered', 'success'); router.push(`/patients/${p.id}`); }
-    catch (e) { toast.push((e as Error).message, 'error'); }
+    try {
+      let p: { id: string };
+      try { p = await api.post<{ id: string }>('/patients', body); }
+      catch (e) {
+        const dups = (e instanceof ApiError && e.status === 409 && (e.body as { duplicates?: any[] })?.duplicates) || null;
+        if (!dups) throw e;
+        const list = dups.slice(0, 5).map((d) => `• ${d.firstName} ${d.lastName} (${d.mrn}${d.idNumber ? `, ID ${d.idNumber}` : ''})`).join('\n');
+        if (!window.confirm(`Possible duplicate patient(s):\n${list}\n\nOK = register as a new patient anyway, Cancel = open the first match.`)) { router.push(`/patients/${dups[0].id}`); return; }
+        p = await api.post<{ id: string }>('/patients', { ...body, force: true });
+      }
+      toast.push('Patient registered', 'success'); router.push(`/patients/${p.id}`);
+    } catch (e) { toast.push((e as Error).message, 'error'); }
   });
   const inp = (n: keyof F, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => <Field label={label} error={errors[n]?.message as string}><input className="input" {...props} {...register(n)} /></Field>;
   return (

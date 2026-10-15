@@ -117,7 +117,7 @@ export class VisitsService {
   async list(tenantId: string, q: VisitQueryDto) {
     const where: Prisma.VisitWhereInput = {
       tenantId,
-      ...(q.status ? { status: q.status as any } : {}),
+      ...(q.status ? { status: { in: q.status.split(',') as any } } : {}),
       ...(q.type ? { type: q.type } : {}),
       ...(q.patientId ? { patientId: q.patientId } : {}),
       ...(q.facilityId ? { facilityId: q.facilityId } : {}),

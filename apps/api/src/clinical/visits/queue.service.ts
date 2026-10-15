@@ -76,7 +76,7 @@ export class QueueService {
     const waits: Record<string, number[]> = {};
     for (const tk of tickets) {
       const b = (byPoint[tk.servicePoint] ??= { waiting: [], called: [], serving: [], doneToday: 0, avgWaitMins: null });
-      const view = { id: tk.id, token: tk.token, priority: tk.priority, status: tk.status, waitingMins: Math.round((now - tk.createdAt.getTime()) / 60000), patient: tk.visit.patient, visitNumber: tk.visit.visitNumber };
+      const view = { id: tk.id, visitId: tk.visitId, servicePoint: tk.servicePoint, calledAt: tk.calledAt, token: tk.token, priority: tk.priority, status: tk.status, waitingMins: Math.round((now - tk.createdAt.getTime()) / 60000), patient: tk.visit.patient, visitNumber: tk.visit.visitNumber };
       if (tk.status === 'WAITING') b.waiting.push(view);
       else if (tk.status === 'CALLED') b.called.push(view);
       else if (tk.status === 'SERVING') b.serving.push(view);

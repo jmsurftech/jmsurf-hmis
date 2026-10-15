@@ -1,18 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DataTable } from '@/components/DataTable';
 import { Modal, PageHeader, Spinner, StatusBadge, Tabs } from '@/components/ui';
-import { useAction, useGet } from '@/lib/hooks';
+import { useAction, useList } from '@/lib/hooks';
 import { dateTime, fullName } from '@/lib/format';
 
-const STAGES = [{ id: 'PENDING_COLLECTION', label: 'To collect' }, { id: 'COLLECTED', label: 'Awaiting results' }, { id: 'RESULTED', label: 'To verify' }, { id: 'VERIFIED', label: 'Verified' }];
-function flagFor(v: string, lo?: number, hi?: number, clo?: number, chi?: number) {
-  const n = Number(v); if (v === '' || isNaN(n)) return '';
-  if (clo != null && n < clo) return 'LL'; if (chi != null && n > chi) return 'HH';
-  if (lo != null && n < lo) return 'L'; if (hi != null && n > hi) return 'H'; return 'N';
-}
+const STAGES = [{ id: 'REQUESTED,PAID', label: 'To collect' }, { id: 'IN_PROGRESS', label: 'Awaiting results' }, { id: 'COMPLETED', label: 'To verify' }, { id: 'VERIFIED', label: 'Verified' }];
+const testCodeOf = (o: any) => String(o.description ?? '').split(':')[0].trim();
+
 export default function Lab() {
-  const [stage, setStage] = useState('PENDING_COLLECTION'); const [sel, setSel] = useState<any>(null);
+  const [stage, setStage] = useState(STAGES[0].id); const [sel, setSel] = useState<any>(null);
   const inv = { invalidate: ['/lab'] };
   const collect = useAction<string>('post', (id) => `/lab/orders/${id}/collect`, { ...inv, success: 'Sample collected' });
   const verify = useAction<string>('post', (id) => `/lab/orders/${id}/verify`, { ...inv, success: 'Results verified & released' });
@@ -20,36 +17,40 @@ export default function Lab() {
     <div>
       <PageHeader title="Laboratory" subtitle="Worklist: collect → result → verify" />
       <Tabs tabs={STAGES} value={stage} onChange={setStage} />
-      <DataTable path="/lab/orders" query={{ status: stage }} columns={[
-        { key: 'orderNumber', header: 'Lab no.', render: (o: any) => o.labNumber ?? o.sampleId ?? o.id.slice(0, 8) },
-        { key: 'patient', header: 'Patient', render: (o: any) => <span>{fullName(o.patient)}<span className="block text-xs text-slate-500">{o.patient?.mrn}</span></span> },
-        { key: 'test', header: 'Test', render: (o: any) => o.test?.name ?? o.serviceItem?.name ?? o.name },
+      <DataTable path="/lab/worklist" query={{ status: stage }} columns={[
+        { key: 'accession', header: 'Lab no.', render: (o: any) => o.labSpecimen?.accession ?? '—' },
+        { key: 'patient', header: 'Patient', render: (o: any) => <span>{fullName(o.visit?.patient)}<span className="block text-xs text-slate-500">{o.visit?.patient?.mrn}</span></span> },
+        { key: 'description', header: 'Test' },
         { key: 'priority', header: 'Priority', render: (o: any) => <StatusBadge status={o.priority ?? 'ROUTINE'} tone={o.priority === 'STAT' ? 'red' : 'slate'} /> },
         { key: 'createdAt', header: 'Ordered', render: (o: any) => dateTime(o.createdAt) },
         { key: 'status', header: 'Status', render: (o: any) => <StatusBadge status={o.status} /> },
-        { key: 'a', header: '', render: (o: any) => stage === 'PENDING_COLLECTION' ? <button className="btn-primary py-1 text-xs" onClick={() => collect.mutate(o.id)}>Collect</button>
-          : stage === 'COLLECTED' ? <button className="btn-primary py-1 text-xs" onClick={() => setSel(o)}>Enter results</button>
-          : stage === 'RESULTED' ? <span className="flex gap-1"><button className="btn-secondary py-1 text-xs" onClick={() => setSel(o)}>Review</button><button className="btn-primary py-1 text-xs" onClick={() => verify.mutate(o.id)}>Verify</button></span>
+        { key: 'a', header: '', render: (o: any) => o.status === 'REQUESTED' || o.status === 'PAID' ? <button className="btn-primary py-1 text-xs" onClick={() => collect.mutate(o.id)}>Collect</button>
+          : o.status === 'IN_PROGRESS' ? <button className="btn-primary py-1 text-xs" onClick={() => setSel(o)}>Enter results</button>
+          : o.status === 'COMPLETED' ? <span className="flex gap-1"><button className="btn-secondary py-1 text-xs" onClick={() => setSel(o)}>Review</button><button className="btn-primary py-1 text-xs" onClick={() => verify.mutate(o.id)}>Verify</button></span>
           : <button className="btn-secondary py-1 text-xs" onClick={() => setSel(o)}>View</button> },
       ]} />
-      {sel && <ResultDialog order={sel} onClose={() => setSel(null)} readOnly={stage === 'VERIFIED'} />}
+      {sel && <ResultDialog order={sel} onClose={() => setSel(null)} readOnly={sel.status === 'VERIFIED'} />}
     </div>
   );
 }
+
 function ResultDialog({ order, onClose, readOnly }: { order: any; onClose: () => void; readOnly?: boolean }) {
-  const { data } = useGet<any>(`/lab/orders/${order.id}`);
-  const params: any[] = data?.parameters ?? data?.test?.parameters ?? [{ id: 'result', name: order.test?.name ?? 'Result', unit: '', refLow: undefined, refHigh: undefined }];
-  const [vals, setVals] = useState<Record<string, string>>({}); const [comment, setComment] = useState('');
+  const tests = useList<any>('/lab/tests', { pageSize: 500 });
+  const byCode = useMemo(() => new Map((tests.data?.data ?? []).map((t: any) => [t.code, t])), [tests.data]);
+  const code = testCodeOf(order); const test: any = byCode.get(code);
+  const params: any[] = test ? (test.panelOf?.length ? test.panelOf.map((c: string) => byCode.get(c) ?? { code: c, name: c }) : [test]) : [{ code: code || 'RESULT', name: order.description }];
+  const existing: Record<string, any> = Object.fromEntries((order.labResults ?? []).map((r: any) => [r.testCode, r]));
+  const [vals, setVals] = useState<Record<string, string>>({});
   const save = useAction('post', `/lab/orders/${order.id}/results`, { invalidate: ['/lab'], success: 'Results saved', onSuccess: onClose });
-  const existing: Record<string, any> = Object.fromEntries((data?.results ?? []).map((r: any) => [r.parameterId ?? r.name, r]));
+  const range = (p: any) => { const r = Array.isArray(p.refRanges) ? p.refRanges[0] : null; return r ? `${r.low ?? ''} – ${r.high ?? ''}` : ''; };
+  const results = params.map((p) => ({ testCode: p.code, value: vals[p.code] ?? existing[p.code]?.value ?? '', unit: p.unit || undefined })).filter((r) => r.value !== '');
   return (
-    <Modal open onClose={onClose} title={`Results: ${order.test?.name ?? order.serviceItem?.name ?? ''}`} wide footer={!readOnly && <><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate({ comment, results: params.map((p) => ({ parameterId: p.id, name: p.name, value: vals[p.id] ?? existing[p.id]?.value ?? '', unit: p.unit, flag: flagFor(vals[p.id] ?? '', p.refLow, p.refHigh, p.criticalLow, p.criticalHigh) || undefined })) })}>{save.isPending && <Spinner />}Save results</button></>}>
-      <p className="mb-3 text-sm text-slate-500">{fullName(order.patient)} · {order.patient?.mrn}</p>
-      <table className="w-full text-sm"><thead><tr><th className="th">Parameter</th><th className="th">Value</th><th className="th">Unit</th><th className="th">Reference</th><th className="th">Flag</th></tr></thead><tbody>
-        {params.map((p) => { const v = vals[p.id] ?? existing[p.id]?.value ?? ''; const f = existing[p.id]?.flag ?? flagFor(v, p.refLow, p.refHigh, p.criticalLow, p.criticalHigh);
-          return <tr key={p.id}><td className="td">{p.name}</td><td className="td"><input className="input w-28" disabled={readOnly} value={v} onChange={(e) => setVals({ ...vals, [p.id]: e.target.value })} /></td><td className="td">{p.unit}</td><td className="td text-xs">{p.refLow ?? ''}{p.refHigh != null ? ` – ${p.refHigh}` : p.refText ?? ''}</td><td className="td">{f && <StatusBadge status={f === 'N' ? 'NORMAL' : f} />}</td></tr>; })}
-      </tbody></table>
-      <label className="mt-3 block"><span className="label">Comment</span><textarea className="input" disabled={readOnly} rows={2} value={comment || data?.comment || ''} onChange={(e) => setComment(e.target.value)} /></label>
+    <Modal open onClose={onClose} title={`Results: ${order.description}`} wide footer={!readOnly && <><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={save.isPending || !results.length} onClick={() => save.mutate({ results })}>{save.isPending && <Spinner />}Save results</button></>}>
+      <p className="mb-3 text-sm text-slate-500">{fullName(order.visit?.patient)} · {order.visit?.patient?.mrn} · {order.labSpecimen?.accession}</p>
+      {tests.isLoading ? <Spinner /> : <table className="w-full text-sm"><thead><tr><th className="th">Test</th><th className="th">Value</th><th className="th">Unit</th><th className="th">Reference</th><th className="th">Flag</th></tr></thead><tbody>
+        {params.map((p) => { const v = vals[p.code] ?? existing[p.code]?.value ?? ''; const f = existing[p.code]?.flag;
+          return <tr key={p.code}><td className="td">{p.name} <span className="text-xs text-slate-500">{p.code}</span></td><td className="td"><input className="input w-28" disabled={readOnly} value={v} onChange={(e) => setVals({ ...vals, [p.code]: e.target.value })} /></td><td className="td">{p.unit}</td><td className="td text-xs">{range(p)}</td><td className="td">{f && <StatusBadge status={f === 'N' ? 'NORMAL' : f} />}</td></tr>; })}
+      </tbody></table>}
     </Modal>
   );
 }

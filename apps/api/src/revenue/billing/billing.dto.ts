@@ -4,6 +4,7 @@ import { ListQuery } from '../list-query';
 export class BillListQuery extends ListQuery {
   @IsOptional() @IsIn(['OPEN', 'INTERIM', 'FINAL', 'PAID', 'PARTIALLY_PAID', 'VOID']) status?: string;
   @IsOptional() @IsString() visitId?: string;
+  @IsOptional() @IsString() patientId?: string;
 }
 export class ManualLineDto {
   @IsOptional() @IsString() serviceItemId?: string;

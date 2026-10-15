@@ -7,7 +7,10 @@ import { withTenant } from '../../integrations/integration-context';
 import { ListQuery, pageArgs, paged } from '../list-query';
 import { BillListQuery, DiscountDto, FinalizeDto, ManualLineDto } from './billing.dto';
 
-const BILL_INCLUDE = { lines: { orderBy: { createdAt: 'asc' as const } }, payments: { orderBy: { createdAt: 'asc' as const } } };
+const BILL_INCLUDE = {
+  lines: { orderBy: { createdAt: 'asc' as const } }, payments: { orderBy: { createdAt: 'asc' as const } },
+  visit: { select: { id: true, visitNumber: true, payerType: true, schemeId: true, patient: { select: { id: true, mrn: true, firstName: true, lastName: true, phone: true } } } },
+};
 
 @Injectable()
 export class BillingService {
@@ -21,6 +24,7 @@ export class BillingService {
     const where: any = { tenantId };
     if (q.status) where.status = q.status;
     if (q.visitId) where.visitId = q.visitId;
+    if (q.patientId) where.visit = { patientId: q.patientId };
     if (q.q) where.OR = [
       { billNumber: { contains: q.q, mode: 'insensitive' } },
       { visit: { patient: { OR: [{ lastName: { contains: q.q, mode: 'insensitive' } }, { firstName: { contains: q.q, mode: 'insensitive' } }, { mrn: q.q }] } } },

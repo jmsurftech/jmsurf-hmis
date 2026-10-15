@@ -5,9 +5,12 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useAction } from '@/lib/hooks';
 import { Field, Modal, Spinner } from './ui';
+import { EntityPicker, type PickerSource } from './EntityPicker';
 
 export interface FieldDef {
-  name: string; label: string; type?: 'text' | 'number' | 'date' | 'datetime-local' | 'email' | 'select' | 'textarea' | 'money' | 'checkbox' | 'tel' | 'password';
+  name: string; label: string; type?: 'text' | 'number' | 'date' | 'datetime-local' | 'email' | 'select' | 'textarea' | 'money' | 'checkbox' | 'tel' | 'password' | 'picker';
+  /** For type 'picker': searchable async select over a list endpoint. */
+  source?: PickerSource;
   options?: (string | { value: string; label: string })[]; required?: boolean; placeholder?: string; full?: boolean;
 }
 
@@ -50,7 +53,9 @@ export function FormDialog({ open, onClose, title, fields, path, method = 'post'
           const reg = form.register(f.name);
           return (
             <Field key={f.name} label={f.label + (f.required ? ' *' : '')} error={err} className={f.full || f.type === 'textarea' ? 'sm:col-span-2' : ''}>
-              {f.type === 'select' ? (
+              {f.type === 'picker' && f.source ? (
+                <EntityPicker source={f.source} value={form.watch(f.name)} placeholder={f.placeholder ?? `Search ${f.label.toLowerCase()}…`} onChange={(id) => form.setValue(f.name, id, { shouldValidate: true })} />
+              ) : f.type === 'select' ? (
                 <select className="input" {...reg}><option value="">Select…</option>{f.options?.map((o) => typeof o === 'string' ? <option key={o} value={o}>{o.replace(/_/g, ' ')}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               ) : f.type === 'textarea' ? <textarea rows={3} className="input" placeholder={f.placeholder} {...reg} />
                 : f.type === 'checkbox' ? <input type="checkbox" className="h-4 w-4" {...reg} />

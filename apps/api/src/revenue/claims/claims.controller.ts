@@ -19,7 +19,7 @@ export class ClaimsController {
   @Get('remittances') remittances(@CurrentUser() u: AuthUser, @Query() q: ListQuery) { return this.svc.listRemittances(u.tenantId, q); }
   @Post('remittances') importRemittance(@CurrentUser() u: AuthUser, @Body() dto: RemittanceDto) { return this.svc.importRemittance(u.tenantId, u.sub, dto); }
   @Post('from-bill') build(@CurrentUser() u: AuthUser, @Body() dto: BuildClaimDto) { return this.svc.buildFromBill(u.tenantId, u.sub, dto.billId); }
-  @Get(':id') get(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.get(u.tenantId, id); }
+  @Get(':id') get(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.getDetail(u.tenantId, id); }
   @Get(':id/fhir') fhir(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.buildFhir(u.tenantId, id); }
   @Post(':id/scrub') scrub(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.scrub(u.tenantId, id); }
   @Post(':id/submit') submit(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.submit(u.tenantId, u.sub, id); }

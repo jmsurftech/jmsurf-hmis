@@ -16,7 +16,7 @@ const BED_COLORS: Record<string, string> = {
 };
 export default function Ipd() {
   const router = useRouter();
-  const { data, isLoading } = useList<any>('/ipd/wards', { includeBeds: true, pageSize: 100 });
+  const { data, isLoading } = useList<any>('/inpatient/bed-board');
   const wards = data?.data ?? [];
   const beds = wards.flatMap((w) => w.beds ?? []);
   const count = (s: string) => beds.filter((b: any) => b.status === s).length;
@@ -35,9 +35,9 @@ export default function Ipd() {
           <Card key={w.id} title={`${w.name} · ${(w.beds ?? []).filter((b: any) => b.status === 'OCCUPIED').length}/${(w.beds ?? []).length} occupied`}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
               {(w.beds ?? []).map((b: any) => (
-                <button key={b.id} onClick={() => b.admissionId && router.push(`/ipd/admissions/${b.admissionId}`)} className={cn('rounded-lg border p-2 text-left text-xs', BED_COLORS[b.status] ?? BED_COLORS.MAINTENANCE)}>
-                  <p className="font-semibold">{b.label ?? b.number}</p>
-                  <p className="truncate">{b.patient ? fullName(b.patient) : b.status}</p>
+                <button key={b.id} onClick={() => b.admission && router.push(`/ipd/admissions/${b.admission.id}`)} className={cn('rounded-lg border p-2 text-left text-xs', BED_COLORS[b.status] ?? BED_COLORS.MAINTENANCE)}>
+                  <p className="font-semibold">{b.label}</p>
+                  <p className="truncate">{b.admission ? `${fullName(b.admission.visit?.patient)} · ${b.admission.losDays}d` : b.status}</p>
                 </button>
               ))}
             </div>
@@ -45,10 +45,10 @@ export default function Ipd() {
         ))}
       </div>}
       <h2 className="mb-2 mt-6 font-semibold">Current admissions</h2>
-      <DataTable path="/ipd/admissions" query={{ status: 'ADMITTED' }} onRowClick={(a: any) => router.push(`/ipd/admissions/${a.id}`)} columns={[
-        { key: 'admissionNumber', header: 'IP no.' }, { key: 'patient', header: 'Patient', render: (a: any) => fullName(a.patient) },
-        { key: 'ward', header: 'Ward / bed', render: (a: any) => `${a.ward?.name ?? ''} ${a.bed?.label ?? ''}` }, { key: 'admittedAt', header: 'Admitted', render: (a: any) => date(a.admittedAt) },
-        { key: 'status', header: 'Status', render: (a: any) => <StatusBadge status={a.status} /> },
+      <DataTable path="/inpatient/admissions" searchable={false} onRowClick={(a: any) => router.push(`/ipd/admissions/${a.id}`)} columns={[
+        { key: 'visit', header: 'Visit', render: (a: any) => a.visit?.visitNumber }, { key: 'patient', header: 'Patient', render: (a: any) => fullName(a.visit?.patient) },
+        { key: 'ward', header: 'Ward / bed', render: (a: any) => { const w = wards.find((x: any) => x.id === a.wardId); return `${w?.name ?? ''} ${w?.beds?.find((b: any) => b.id === a.bedId)?.label ?? ''}`; } }, { key: 'admittedAt', header: 'Admitted', render: (a: any) => date(a.admittedAt) },
+        { key: 'status', header: 'Status', render: () => <StatusBadge status="ADMITTED" /> },
       ]} />
     </div>
   );

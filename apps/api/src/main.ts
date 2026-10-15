@@ -9,7 +9,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(helmet());
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: (process.env.WEB_ORIGIN || '*').split(','), credentials: true });
+  // Unset WEB_ORIGIN reflects the request origin (dev); ['*'] would only match the literal origin "*".
+  app.enableCors({ origin: process.env.WEB_ORIGIN ? process.env.WEB_ORIGIN.split(',').map((o) => o.trim()) : true, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const config = new DocumentBuilder().setTitle('JMSURF HMIS API').setVersion('0.1.0').addBearerAuth().build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));

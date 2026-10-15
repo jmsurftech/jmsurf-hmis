@@ -4,20 +4,25 @@ import { useForm } from 'react-hook-form';
 import { Card, Field, Loading, PageHeader, Spinner } from '@/components/ui';
 import { useAction, useGet } from '@/lib/hooks';
 
+/** Tenant settings: top-level tenant fields plus free-form `settings` JSON (address, receipts, integrations…). */
 export default function AdminSettings() {
-  const { data, isLoading } = useGet<any>('/admin/settings');
+  const { data, isLoading } = useGet<any>('/admin/tenant');
   const { register, handleSubmit, reset, watch } = useForm<Record<string, any>>();
-  useEffect(() => { if (data) reset(data); }, [data, reset]);
-  const save = useAction('patch', '/admin/settings', { invalidate: ['/admin/settings'], success: 'Settings saved' });
+  useEffect(() => { if (data) reset({ ...data, ...(data.settings ?? {}), integrations: data.settings?.integrations ?? {} }); }, [data, reset]);
+  const save = useAction('patch', '/admin/tenant', { invalidate: ['/admin/tenant'], success: 'Settings saved' });
   const color = watch('primaryColor') || '#0d7c80';
   if (isLoading) return <Loading />;
+  const submit = (v: Record<string, any>) => save.mutate({
+    name: v.name, logoUrl: v.logoUrl || undefined, primaryColor: v.primaryColor || undefined, kraPin: v.kraPin || undefined, timezone: v.timezone || undefined,
+    settings: { phone: v.phone, address: v.address, customDomain: v.customDomain, receiptHeader: v.receiptHeader, receiptFooter: v.receiptFooter, mpesaShortcode: v.integrations?.mpesaShortcode, integrations: v.integrations },
+  });
   return (
-    <form onSubmit={handleSubmit((v) => save.mutate(v))}>
+    <form onSubmit={handleSubmit(submit)}>
       <PageHeader title="Settings & branding" actions={<button className="btn-primary" disabled={save.isPending}>{save.isPending && <Spinner />}Save</button>} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Organisation"><div className="grid gap-3 sm:grid-cols-2">
           <Field label="Name"><input className="input" {...register('name')} /></Field><Field label="KRA PIN"><input className="input" {...register('kraPin')} /></Field>
-          <Field label="Country"><input className="input" {...register('countryCode')} /></Field><Field label="Currency"><input className="input" {...register('currency')} /></Field>
+          <Field label="Country"><input className="input" disabled {...register('countryCode')} /></Field><Field label="Currency"><input className="input" disabled {...register('currency')} /></Field>
           <Field label="Timezone"><input className="input" {...register('timezone')} /></Field><Field label="Phone"><input className="input" {...register('phone')} /></Field>
           <Field label="Address" className="sm:col-span-2"><input className="input" {...register('address')} /></Field></div></Card>
         <Card title="Branding"><div className="grid gap-3 sm:grid-cols-2">

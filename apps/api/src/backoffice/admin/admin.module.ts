@@ -298,7 +298,7 @@ export class AdminController {
   @Post('facilities') createFacility(@CurrentUser() u: AuthUser, @Body() dto: FacilityDto) { return this.svc.createFacility(u, dto); }
   @Patch('facilities/:id') updateFacility(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: UpdateFacilityDto) { return this.svc.updateFacility(u, id, dto); }
 
-  @Get('departments') @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+  @Get('departments') @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT', 'RECEPTION', 'TRIAGE_NURSE', 'NURSE', 'DOCTOR', 'CLINICAL_OFFICER')
   listDepartments(@CurrentUser() u: AuthUser, @Query('facilityId') facilityId?: string) { return this.svc.listDepartments(u, facilityId); }
   @Post('departments') createDepartment(@CurrentUser() u: AuthUser, @Body() dto: DepartmentDto) { return this.svc.createDepartment(u, dto); }
   @Patch('departments/:id') updateDepartment(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: UpdateDepartmentDto) { return this.svc.updateDepartment(u, id, dto); }
@@ -311,7 +311,7 @@ export class AdminController {
   @Post('users/:id/deactivate') deactivateUser(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.deactivateUser(u, id); }
   @Post('users/:id/reset-password') resetPassword(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.resetPassword(u, id); }
 
-  @Get('practitioners') @Roles('ADMIN', 'HR', 'MANAGER') listPractitioners(@CurrentUser() u: AuthUser) { return this.svc.listPractitioners(u); }
+  @Get('practitioners') @Roles('ADMIN', 'HR', 'MANAGER', 'RECEPTION', 'DOCTOR', 'CLINICAL_OFFICER', 'NURSE') listPractitioners(@CurrentUser() u: AuthUser) { return this.svc.listPractitioners(u); }
   @Get('practitioners/licence-alerts') @Roles('ADMIN', 'HR', 'MANAGER')
   licenceAlerts(@CurrentUser() u: AuthUser, @Query('days') days?: string) { return this.svc.licenceAlerts(u, days ? Number(days) : 60); }
   @Post('practitioners') @Roles('ADMIN', 'HR') createPractitioner(@CurrentUser() u: AuthUser, @Body() dto: PractitionerDto) { return this.svc.createPractitioner(u, dto); }

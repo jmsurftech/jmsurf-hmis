@@ -59,7 +59,7 @@ const USERS: { email: string; first: string; last: string; roles: string[]; cadr
 
 // [code, name, category, departmentType, priceKES, shaCode?]
 const SERVICES: [string, string, string, string, number, string?][] = [
-  ['CONSULT', 'General Consultation', 'CONSULTATION', 'OPD', 1000, 'SHA-PHC-OP'],
+  ['CONSULT', 'General Consultation', 'CONSULTATION', 'OPD', 1000, 'SAMPLE-PHC-OPD-001'],
   ['CONSULT-REV', 'Review Consultation', 'CONSULTATION', 'OPD', 500],
   ['CONSULT-SPEC', 'Specialist Consultation', 'CONSULTATION', 'OPD', 2500],
   ['CONSULT-PAED', 'Paediatric Consultation', 'CONSULTATION', 'OPD', 1500],
@@ -89,11 +89,11 @@ const SERVICES: [string, string, string, string, number, string?][] = [
   ['PROC-ID', 'Incision & Drainage', 'PROCEDURE', 'EMERGENCY', 3000],
   ['PROC-EXTRACT', 'Dental Extraction', 'PROCEDURE', 'DENTAL', 1500],
   ['PROC-FILL', 'Dental Filling', 'PROCEDURE', 'DENTAL', 3000],
-  ['THR-CS', 'Caesarean Section', 'THEATRE', 'THEATRE', 65000, 'SHA-SURG-CS'],
+  ['THR-CS', 'Caesarean Section', 'THEATRE', 'THEATRE', 65000, 'SAMPLE-SHIF-MAT-002'],
   ['THR-APPX', 'Appendicectomy', 'THEATRE', 'THEATRE', 55000],
   ['THR-HERNIA', 'Herniorrhaphy', 'THEATRE', 'THEATRE', 45000],
-  ['DEL-SVD', 'Normal Delivery (SVD)', 'PROCEDURE', 'MATERNITY', 10000, 'SHA-MAT-SVD'],
-  ['DIALYSIS', 'Haemodialysis Session', 'PROCEDURE', 'DIALYSIS', 9500, 'SHA-DIAL'],
+  ['DEL-SVD', 'Normal Delivery (SVD)', 'PROCEDURE', 'MATERNITY', 10000, 'SAMPLE-SHIF-MAT-001'],
+  ['DIALYSIS', 'Haemodialysis Session', 'PROCEDURE', 'DIALYSIS', 9500, 'SAMPLE-SHIF-REN-001'],
   ['PHYSIO', 'Physiotherapy Session', 'PROCEDURE', 'OPD', 1500],
   ['BED-GEN', 'Bed Day - General Ward', 'BED', 'IPD', 3000],
   ['BED-MAT', 'Bed Day - Maternity', 'BED', 'MATERNITY', 3500],
