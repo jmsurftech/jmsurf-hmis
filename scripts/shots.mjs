@@ -10,12 +10,23 @@ const theme = process.argv[4] || 'light';
 const email = process.env.EMAIL || 'admin@demo.jmsurf.health';
 const r = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: process.env.PASS || 'Demo@1234' }) });
 const j = await r.json();
+// PORTAL=<patientId> also opens a patient-portal session for that patient (test stack secret only).
+let portal = null;
+if (process.env.PORTAL) {
+  const { createHmac } = await import('crypto');
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const body = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ sub: process.env.PORTAL, tenantId: j.user.tenantId, portal: true, iat: now, exp: now + 3600 });
+  const sig = createHmac('sha256', (process.env.JWT_SECRET || 'test-secret-test-secret') + '::patient-portal').update(body).digest('base64url');
+  portal = JSON.stringify({ token: body + '.' + sig, patient: { id: process.env.PORTAL, mrn: '', firstName: 'Test', lastName: 'Patient' }, hospital: { id: j.user.tenantId, name: 'Test hospital' } });
+}
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width, height: width < 600 ? 844 : 900 }, deviceScaleFactor: 1, colorScheme: theme });
-await ctx.addInitScript(([t, f, th]) => {
+await ctx.addInitScript(([t, f, th, pt]) => {
   if (!location.pathname.startsWith('/login') || location.search.includes('keep')) { localStorage.setItem('jmsurf.token', t); if (f) localStorage.setItem('jmsurf.facility', f); }
   localStorage.setItem('jmsurf.theme', th);
-}, [j.accessToken, j.user?.facilityIds?.[0], theme]);
+  if (pt) localStorage.setItem('jmsurf.portal', pt);
+}, [j.accessToken, j.user?.facilityIds?.[0], theme, portal]);
 for (const p of paths) {
   const page = await ctx.newPage();
   const errs = [];

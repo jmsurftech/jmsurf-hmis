@@ -34,6 +34,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-jmsurf}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jmsurf_hmis}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
       API_PORT: 4000
       WEB_ORIGIN: ${WEB_ORIGIN:-*}

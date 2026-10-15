@@ -1,11 +1,11 @@
 'use client';
-import { Bell, ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Moon, RefreshCw, Search, Settings, Sun, UserCircle2, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Moon, RefreshCw, Search, Settings, ShieldCheck, Sun, UserCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useGet, useList } from '@/lib/hooks';
-import { BOTTOM, NAV, type NavItem } from '@/lib/nav';
+import { BOTTOM, NAV, type NavGroup, type NavItem } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { CommandPalette } from './CommandPalette';
@@ -61,6 +61,7 @@ function UserMenu() {
           <div className="divider" style={{ margin: '4px 0' }} />
           <button onClick={() => { setOpen(false); router.push('/account'); }}><UserCircle2 />My account</button>
           {user.roles.includes('ADMIN') && <button onClick={() => { setOpen(false); router.push('/admin'); }}><Settings />Facility settings</button>}
+          {user.isSuperAdmin && <button onClick={() => { setOpen(false); router.push(window.location.pathname.startsWith('/platform') ? '/dashboard' : '/platform'); }}><ShieldCheck />{typeof window !== 'undefined' && window.location.pathname.startsWith('/platform') ? 'Back to my facility' : 'Platform console'}</button>}
           <button onClick={toggle}>{dark ? <Sun /> : <Moon />}{dark ? 'Light mode' : 'Dark mode'}</button>
           <button onClick={logout} style={{ color: 'var(--bad)' }}><LogOut style={{ color: 'var(--bad)' }} />Sign out</button>
         </div>
@@ -91,7 +92,8 @@ function Notifications() {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+/** Staff shell. The platform console passes its own nav, home link, bottom bar and subtitle. */
+export function AppShell({ children, nav = NAV, home = '/dashboard', bottomNav = BOTTOM, sub }: { children: React.ReactNode; nav?: NavGroup[]; home?: string; bottomNav?: string[]; sub?: string }) {
   const { user, loading, hasRole } = useAuth();
   const router = useRouter(); const path = usePathname();
   const [mobile, setMobile] = useState(false); const [palette, setPalette] = useState(false); const [filter, setFilter] = useState('');
@@ -104,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); } };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
-  const groups = useMemo(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole]);
+  const groups = useMemo(() => nav.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole, nav]);
   const all = useMemo(() => groups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label }))), [groups]);
   if (loading || !user) return <div className="grid min-h-screen place-items-center"><div className="w-72"><Loading rows={3} /></div></div>;
 
@@ -112,7 +114,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const f = filter.trim().toLowerCase();
   const shown = f ? groups.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(f) || g.label.toLowerCase().includes(f)) })).filter((g) => g.items.length) : groups;
   const toggleGroup = (t: string) => setClosed((c) => { const n = { ...c, [t]: !c[t] }; try { localStorage.setItem('hmis.nav.closed', JSON.stringify(n)); } catch { /* private mode */ } return n; });
-  const bottom: NavItem[] = BOTTOM.map((h) => all.find((i) => i.href === h)).filter(Boolean).slice(0, 4) as NavItem[];
+  const bottom: NavItem[] = bottomNav.map((h) => all.find((i) => i.href === h)).filter(Boolean).slice(0, 4) as NavItem[];
   const moreActive = !bottom.some((i) => isActive(path, i.href));
 
   return (
@@ -120,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="glass-bubbles" aria-hidden>{BUBBLES.map(([l, t, s, d]) => <span key={`${l}-${t}`} style={{ left: `${l}%`, top: `${t}%`, width: s, height: s, animationDelay: `-${d}s` }} />)}</div>
       {mobile && <div className="scrim" onClick={() => setMobile(false)} />}
       <aside className={cn('side no-print', mobile && 'open')}>
-        <div className="side-head"><Link href="/dashboard" className="min-w-0 flex-1 text-inherit no-underline" style={{ color: 'inherit' }}><Logo sub={user.tenant?.name ?? 'Hospital management'} /></Link>
+        <div className="side-head"><Link href={home} className="min-w-0 flex-1 text-inherit no-underline" style={{ color: 'inherit' }}><Logo sub={sub ?? user.tenant?.name ?? 'Hospital management'} /></Link>
           <button className="side-close" onClick={() => setMobile(false)} aria-label="Close menu"><X className="h-5 w-5" /></button></div>
         <div className="side-search"><Search className="h-3.5 w-3.5" /><input placeholder="Find a page" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find a page" /><kbd>Ctrl K</kbd></div>
         <div className="side-scroll">

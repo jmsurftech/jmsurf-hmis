@@ -76,6 +76,10 @@ export class AuthService {
     if (!user || !user.active || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (user.tenantId && !user.isSuperAdmin) {
+      const t = await this.prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { suspendedAt: true } });
+      if (t?.suspendedAt) throw new UnauthorizedException('This facility account is suspended. Contact JMSURF support.');
+    }
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await this.audit.log({ tenantId: user.tenantId ?? undefined, userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id });
     return { accessToken: this.sign(user), user: this.publicUser(user) };

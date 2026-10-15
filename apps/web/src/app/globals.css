@@ -458,3 +458,15 @@
   .card { box-shadow: none; border-color: #ddd; background: #fff; backdrop-filter: none; }
   @page { margin: 12mm; }
 }
+
+/* Patient portal: one glass top bar with tabs (desktop) and the notch bar (phones). */
+.portal { position: relative; }
+.portal-top { position: sticky; top: 10px; z-index: 30; margin: 10px auto 0; max-width: 1240px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 14px; background: rgb(253 251 252 / .86); backdrop-filter: blur(18px) saturate(140%); border: 1px solid var(--glass-edge); border-radius: 22px; box-shadow: var(--glass-shadow); }
+:root.dark .portal-top { background: rgb(28 26 29 / .86); border-color: var(--line); }
+.portal-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.portal-tabs .tab { text-decoration: none; }
+.portal-main { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 24px 16px 110px; }
+@media (max-width: 1023px) { .portal-tabs { display: none; } .portal-top { margin: 8px 8px 0; } }
+@media (min-width: 1024px) { .portal-main { padding-bottom: 40px; } }
+
+.portal > .glass-bubbles { position: fixed; }

@@ -37,6 +37,7 @@ function LoginForm() {
         <button className="btn primary lg mt-1 w-full" disabled={isSubmitting}>{isSubmitting ? <Spinner /> : null}Sign in<ArrowRight /></button>
       </div>
       <p className="m-0 mt-6 text-center text-sm text-slate-500">New facility? <Link href="/signup" className="font-bold text-brand">Create an account</Link></p>
+      <p className="m-0 mt-2 text-center text-sm text-slate-500">Patient? <Link href="/portal/login" className="font-bold text-brand">Open the patient portal</Link></p>
     </form>
   );
 }
