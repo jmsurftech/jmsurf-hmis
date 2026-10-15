@@ -1144,3 +1144,27 @@ model Sequence {
 
   @@id([tenantId, name])
 }
+
+/// Generic clinical / support register (blood bank, mortuary, CSSD, ambulance, specialty clinics, programmes...).
+/// The module key and the shape of `data` are defined by the module catalogue in the web app (lib/registers.ts).
+model ModuleRecord {
+  id          String   @id @default(uuid())
+  tenantId    String
+  facilityId  String?
+  module      String
+  number      String
+  title       String?
+  status      String   @default("OPEN")
+  patientId   String?
+  visitId     String?
+  data        Json     @default("{}")
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId, module, status])
+  @@index([tenantId, module, createdAt])
+  @@index([tenantId, patientId])
+}

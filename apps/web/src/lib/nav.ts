@@ -3,12 +3,14 @@ import {
   FileText, FlaskConical, HeartPulse, Home, LayoutDashboard, ListOrdered, Package, Pill, Receipt, ScanLine, Scissors, Settings,
   ShieldAlert, ShoppingCart, Stethoscope, Users, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
 } from 'lucide-react';
+import { REGISTERS } from './registers';
 
 export interface NavItem { href: string; label: string; icon: React.ElementType; roles?: string[]; short?: string; pill?: string }
 export interface NavGroup { label: string; items: NavItem[] }
 
 const CLIN = ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'TRIAGE_NURSE'];
-export const NAV: NavGroup[] = [
+const reg = (group: string): NavGroup => ({ label: group, items: REGISTERS.filter((r) => r.group === group).map((r) => ({ href: `/r/${r.key}`, label: r.label, icon: r.icon, roles: r.roles })) });
+const BASE: NavGroup[] = [
   { label: 'Overview', items: [{ href: '/dashboard', label: 'Dashboard', short: 'Home', icon: LayoutDashboard }] },
   { label: 'Front office', items: [
     { href: '/patients', label: 'Patients', icon: Users, roles: ['RECEPTION', ...CLIN, 'CASHIER', 'CLAIMS_OFFICER'] },
@@ -55,6 +57,12 @@ export const NAV: NavGroup[] = [
     { href: '/admin/payers', label: 'Payers & schemes', icon: Handshake, roles: ['ADMIN'] },
     { href: '/admin/audit', label: 'Audit log', icon: History, roles: ['ADMIN'] },
   ] },
+];
+/** Sidebar order: core clinical first, then the register-based modules, then revenue and back office. */
+const at = (label: string) => BASE.find((g) => g.label === label)!;
+export const NAV: NavGroup[] = [
+  at('Overview'), at('Front office'), at('Clinical'), reg('Specialty clinics'), reg('Programmes'), reg('Blood bank'), reg('Support services'), reg('Records & documents'),
+  at('Revenue'), at('Supply chain'), at('Back office'), at('Insights'), reg('Quality & operations'), at('Administration'),
 ];
 export const ROLES = ['ADMIN','RECEPTION','TRIAGE_NURSE','NURSE','DOCTOR','CLINICAL_OFFICER','LAB_TECH','RADIOGRAPHER','PHARMACIST','CASHIER','CLAIMS_OFFICER','STOREKEEPER','PROCUREMENT','ACCOUNTANT','HR','MANAGER'];
 export { HeartPulse, ClipboardList, FileText, CreditCard };
