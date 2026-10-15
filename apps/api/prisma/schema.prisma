@@ -1,0 +1,1145 @@
+// JMSURF HMIS — core data model
+// Conventions: every tenant-owned row has tenantId; money is integer minor units (cents) + currency.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Tenancy & identity ─────────────────────────────
+
+enum PlanTier {
+  CLINIC
+  HOSPITAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  GRACE
+  READ_ONLY
+  CANCELLED
+}
+
+model Tenant {
+  id                 String             @id @default(uuid())
+  name               String
+  slug               String             @unique
+  countryCode        String             @default("KE")
+  currency           String             @default("KES")
+  timezone           String             @default("Africa/Nairobi")
+  plan               PlanTier           @default(HOSPITAL)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  logoUrl            String?
+  primaryColor       String?
+  kraPin             String?
+  settings           Json               @default("{}")
+  enabledModules     String[]           @default([])
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  facilities         Facility[]
+  users              User[]
+}
+
+model Facility {
+  id           String       @id @default(uuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  name         String
+  code         String // internal short code e.g. MAIN
+  kmhflCode    String? // KMHFR / MFL code
+  shaFacilityId String?
+  level        Int          @default(4)
+  county       String?
+  address      String?
+  phone        String?
+  email        String?
+  createdAt    DateTime     @default(now())
+  departments  Department[]
+  wards        Ward[]
+  stores       Store[]
+
+  @@unique([tenantId, code])
+}
+
+model Department {
+  id         String   @id @default(uuid())
+  tenantId   String
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String
+  type       String // OPD, IPD, LAB, RADIOLOGY, PHARMACY, THEATRE, MATERNITY, DIALYSIS, EMERGENCY, DENTAL, EYE, ADMIN...
+  costCentre String?
+  active     Boolean  @default(true)
+}
+
+model User {
+  id               String    @id @default(uuid())
+  tenantId         String?
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id])
+  email            String    @unique
+  phone            String?
+  passwordHash     String
+  firstName        String
+  lastName         String
+  roles            String[] // e.g. ADMIN, DOCTOR, NURSE, CASHIER (see packages/domain roles)
+  facilityIds      String[]  @default([])
+  isSuperAdmin     Boolean   @default(false)
+  mfaSecret        String?
+  active           Boolean   @default(true)
+  lastLoginAt      DateTime?
+  practitioner     Practitioner?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Practitioner {
+  id                String    @id @default(uuid())
+  tenantId          String
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  cadre             String // DOCTOR, CLINICAL_OFFICER, NURSE, PHARMACIST, LAB_TECH, RADIOGRAPHER...
+  regulator         String? // KMPDC, NCK, PPB, KMLTTB, COC
+  licenseNumber     String?
+  licenseExpiry     DateTime?
+  hwrId             String? // Health Worker Registry ID
+  specialty         String?
+  consultationFeeMinor Int?
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  userId     String?
+  action     String // CREATE, UPDATE, DELETE, READ_SENSITIVE, LOGIN, BREAK_GLASS
+  entity     String
+  entityId   String?
+  data       Json?
+  ip         String?
+  prevHash   String?
+  hash       String
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt])
+}
+
+// ───────────────────────────── Patients & visits ─────────────────────────────
+
+enum Sex {
+  MALE
+  FEMALE
+  INTERSEX
+  UNKNOWN
+}
+
+model Patient {
+  id             String       @id @default(uuid())
+  tenantId       String
+  mrn            String // facility medical record number
+  crId           String? // national Client Registry ID (SHA/HIE)
+  shaNumber      String?
+  idType         String? // NATIONAL_ID, PASSPORT, BIRTH_CERT, MAISHA_NAMBA, ALIEN_ID, REFUGEE_ID
+  idNumber       String?
+  firstName      String
+  middleName     String?
+  lastName       String
+  sex            Sex
+  dateOfBirth    DateTime?
+  phone          String?
+  email          String?
+  county         String?
+  subCounty      String?
+  village        String?
+  occupation     String?
+  maritalStatus  String?
+  bloodGroup     String?
+  photoUrl       String?
+  nextOfKin      Json? // [{name, relationship, phone}]
+  allergies      Allergy[]
+  covers         MemberCover[]
+  visits         Visit[]
+  consents       Consent[]
+  mergedIntoId   String?
+  deceasedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([tenantId, mrn])
+  @@index([tenantId, idNumber])
+  @@index([tenantId, phone])
+  @@index([tenantId, lastName, firstName])
+}
+
+model Allergy {
+  id        String   @id @default(uuid())
+  tenantId  String
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  substance String
+  reaction  String?
+  severity  String? // MILD, MODERATE, SEVERE
+  createdAt DateTime @default(now())
+}
+
+model Consent {
+  id        String    @id @default(uuid())
+  tenantId  String
+  patientId String
+  patient   Patient   @relation(fields: [patientId], references: [id])
+  scope     String // DATA_SHARING_HIE, SMS, RESEARCH, PROCEDURE
+  granted   Boolean
+  method    String? // OTP, SIGNATURE, VERBAL
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+enum VisitType {
+  OPD
+  IPD
+  EMERGENCY
+  WALK_IN
+  REFERRAL
+  TELEMEDICINE
+  OUTREACH
+  HOME_CARE
+}
+
+enum VisitStatus {
+  OPEN
+  IN_PROGRESS
+  ADMITTED
+  DISCHARGED
+  CLOSED
+  CANCELLED
+}
+
+model Visit {
+  id            String      @id @default(uuid())
+  tenantId      String
+  facilityId    String
+  patientId     String
+  patient       Patient     @relation(fields: [patientId], references: [id])
+  visitNumber   String
+  type          VisitType   @default(OPD)
+  status        VisitStatus @default(OPEN)
+  payerType     String      @default("CASH") // CASH, SHA, INSURANCE, CORPORATE, WAIVER
+  schemeId      String?
+  coverId       String?
+  shaFund       String? // PHC, SHIF, ECCIF
+  eligibilityRef String?
+  departmentId  String?
+  practitionerId String?
+  startedAt     DateTime    @default(now())
+  endedAt       DateTime?
+  triage        Triage[]
+  vitals        Vitals[]
+  notes         ClinicalNote[]
+  diagnoses     Diagnosis[]
+  orders        Order[]
+  prescriptions Prescription[]
+  bills         Bill[]
+  queueTickets  QueueTicket[]
+  admission     Admission?
+
+  @@unique([tenantId, visitNumber])
+  @@index([tenantId, facilityId, startedAt])
+}
+
+model QueueTicket {
+  id           String    @id @default(uuid())
+  tenantId     String
+  facilityId   String
+  visitId      String
+  visit        Visit     @relation(fields: [visitId], references: [id])
+  servicePoint String // TRIAGE, CONSULTATION, LAB, PHARMACY, CASHIER, RADIOLOGY
+  token        String
+  priority     Int       @default(3) // 1 = emergency
+  status       String    @default("WAITING") // WAITING, CALLED, SERVING, DONE, SKIPPED
+  calledAt     DateTime?
+  doneAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, facilityId, servicePoint, status])
+}
+
+model Appointment {
+  id             String   @id @default(uuid())
+  tenantId       String
+  facilityId     String
+  patientId      String
+  practitionerId String?
+  departmentId   String?
+  startAt        DateTime
+  endAt          DateTime
+  mode           String   @default("IN_PERSON") // IN_PERSON, TELEMEDICINE, HOME
+  status         String   @default("BOOKED") // BOOKED, CONFIRMED, ARRIVED, NO_SHOW, CANCELLED, DONE
+  reason         String?
+  meetingUrl     String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, startAt])
+}
+
+// ───────────────────────────── Clinical ─────────────────────────────
+
+model Triage {
+  id         String   @id @default(uuid())
+  tenantId   String
+  visitId    String
+  visit      Visit    @relation(fields: [visitId], references: [id])
+  scale      String   @default("SATS")
+  category   String // RED, ORANGE, YELLOW, GREEN, BLUE
+  complaint  String?
+  score      Int?
+  byUserId   String?
+  createdAt  DateTime @default(now())
+}
+
+model Vitals {
+  id            String   @id @default(uuid())
+  tenantId      String
+  visitId       String
+  visit         Visit    @relation(fields: [visitId], references: [id])
+  temperatureC  Float?
+  pulse         Int?
+  respRate      Int?
+  systolic      Int?
+  diastolic     Int?
+  spo2          Int?
+  weightKg      Float?
+  heightCm      Float?
+  muacCm        Float?
+  bloodSugar    Float?
+  painScore     Int?
+  news2         Int?
+  byUserId      String?
+  takenAt       DateTime @default(now())
+}
+
+model ClinicalNote {
+  id          String   @id @default(uuid())
+  tenantId    String
+  visitId     String
+  visit       Visit    @relation(fields: [visitId], references: [id])
+  type        String   @default("SOAP") // SOAP, PROGRESS, NURSING, WARD_ROUND, DISCHARGE, OPERATION, SPECIALTY
+  specialty   String?
+  subjective  String?
+  objective   String?
+  assessment  String?
+  plan        String?
+  data        Json? // structured specialty form data (dental chart, eye exam...)
+  aiDrafted   Boolean  @default(false)
+  sensitive   Boolean  @default(false)
+  authorId    String?
+  signedAt    DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Diagnosis {
+  id          String   @id @default(uuid())
+  tenantId    String
+  visitId     String
+  visit       Visit    @relation(fields: [visitId], references: [id])
+  codeSystem  String   @default("ICD-11")
+  code        String
+  display     String
+  type        String   @default("PRIMARY") // PRIMARY, SECONDARY, PROVISIONAL
+  createdAt   DateTime @default(now())
+}
+
+enum OrderType {
+  LAB
+  IMAGING
+  PROCEDURE
+  MEDICATION
+  DIET
+  REFERRAL
+  CONSULT
+}
+
+enum OrderStatus {
+  REQUESTED
+  PAID
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  tenantId      String
+  visitId       String
+  visit         Visit       @relation(fields: [visitId], references: [id])
+  type          OrderType
+  serviceId     String? // ServiceItem
+  description   String
+  priority      String      @default("ROUTINE")
+  status        OrderStatus @default(REQUESTED)
+  orderedById   String?
+  notes         String?
+  preauthId     String?
+  labSpecimen   LabSpecimen?
+  labResults    LabResult[]
+  imagingReport ImagingReport?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, type, status])
+}
+
+model LabTest {
+  id             String   @id @default(uuid())
+  tenantId       String
+  code           String
+  name           String
+  loinc          String?
+  specimenType   String?
+  unit           String?
+  refRanges      Json? // [{sex, ageMinDays, ageMaxDays, low, high, criticalLow, criticalHigh}]
+  panelOf        String[] @default([])
+  serviceItemId  String?
+  turnaroundMins Int?
+
+  @@unique([tenantId, code])
+}
+
+model LabSpecimen {
+  id           String    @id @default(uuid())
+  tenantId     String
+  orderId      String    @unique
+  order        Order     @relation(fields: [orderId], references: [id])
+  accession    String
+  specimenType String?
+  collectedAt  DateTime?
+  collectedBy  String?
+  receivedAt   DateTime?
+  rejectedReason String?
+}
+
+model LabResult {
+  id           String    @id @default(uuid())
+  tenantId     String
+  orderId      String
+  order        Order     @relation(fields: [orderId], references: [id])
+  testCode     String
+  value        String
+  unit         String?
+  flag         String? // N, L, H, LL, HH
+  isCritical   Boolean   @default(false)
+  enteredBy    String?
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  source       String    @default("MANUAL") // MANUAL, ANALYZER
+  createdAt    DateTime  @default(now())
+}
+
+model ImagingReport {
+  id          String    @id @default(uuid())
+  tenantId    String
+  orderId     String    @unique
+  order       Order     @relation(fields: [orderId], references: [id])
+  modality    String // XR, US, CT, MRI, MAMMO
+  studyUid    String?
+  findings    String?
+  impression  String?
+  reportedBy  String?
+  verifiedBy  String?
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Prescription {
+  id           String    @id @default(uuid())
+  tenantId     String
+  visitId      String
+  visit        Visit     @relation(fields: [visitId], references: [id])
+  itemId       String
+  drugName     String
+  dose         String
+  route        String?
+  frequency    String
+  durationDays Int?
+  quantity     Int
+  instructions String?
+  status       String    @default("PENDING") // PENDING, PARTIAL, DISPENSED, CANCELLED
+  prescriberId String?
+  dispenses    Dispense[]
+  createdAt    DateTime  @default(now())
+}
+
+model Dispense {
+  id             String       @id @default(uuid())
+  tenantId       String
+  prescriptionId String?
+  prescription   Prescription? @relation(fields: [prescriptionId], references: [id])
+  itemId         String
+  batchId        String?
+  quantity       Int
+  storeId        String
+  dispensedBy    String?
+  createdAt      DateTime     @default(now())
+}
+
+model MedicationAdministration {
+  id             String   @id @default(uuid())
+  tenantId       String
+  admissionId    String
+  prescriptionId String
+  scheduledAt    DateTime
+  givenAt        DateTime?
+  status         String   @default("SCHEDULED") // SCHEDULED, GIVEN, MISSED, REFUSED, HELD
+  givenBy        String?
+  note           String?
+}
+
+// ───────────────────────────── Inpatient / theatre / maternity / dialysis ─────────────────────────────
+
+model Ward {
+  id         String   @id @default(uuid())
+  tenantId   String
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String
+  type       String   @default("GENERAL") // GENERAL, MATERNITY, PAEDIATRIC, ICU, HDU, NBU, PRIVATE
+  dailyRateServiceId String?
+  beds       Bed[]
+}
+
+model Bed {
+  id        String   @id @default(uuid())
+  tenantId  String
+  wardId    String
+  ward      Ward     @relation(fields: [wardId], references: [id])
+  label     String
+  status    String   @default("AVAILABLE") // AVAILABLE, OCCUPIED, CLEANING, MAINTENANCE, RESERVED
+}
+
+model Admission {
+  id             String    @id @default(uuid())
+  tenantId       String
+  visitId        String    @unique
+  visit          Visit     @relation(fields: [visitId], references: [id])
+  wardId         String
+  bedId          String?
+  admittedById   String?
+  reason         String?
+  admittedAt     DateTime  @default(now())
+  dischargedAt   DateTime?
+  dischargeType  String? // NORMAL, AMA, REFERRED, ABSCONDED, DECEASED
+  dischargeSummary String?
+  depositMinor   Int       @default(0)
+  lastChargedAt  DateTime?
+}
+
+model Surgery {
+  id            String    @id @default(uuid())
+  tenantId      String
+  visitId       String
+  theatre       String
+  procedure     String
+  surgeonId     String?
+  anaesthetistId String?
+  scheduledStart DateTime
+  scheduledEnd  DateTime
+  status        String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, DONE, CANCELLED
+  checklist     Json?
+  anaesthesia   Json?
+  operationNote String?
+  preauthId     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, theatre, scheduledStart])
+}
+
+model Pregnancy {
+  id          String   @id @default(uuid())
+  tenantId    String
+  patientId   String
+  lmp         DateTime?
+  edd         DateTime?
+  gravida     Int?
+  parity      Int?
+  riskFlags   String[] @default([])
+  status      String   @default("ACTIVE") // ACTIVE, DELIVERED, LOST
+  ancVisits   Json     @default("[]")
+  createdAt   DateTime @default(now())
+}
+
+model Delivery {
+  id           String   @id @default(uuid())
+  tenantId     String
+  pregnancyId  String
+  visitId      String
+  deliveredAt  DateTime
+  mode         String // SVD, CS, ASSISTED, BREECH
+  outcome      String
+  partograph   Json?
+  babies       Json // [{sex, weightKg, apgar1, apgar5, newbornPatientId}]
+  createdAt    DateTime @default(now())
+}
+
+model Immunization {
+  id          String   @id @default(uuid())
+  tenantId    String
+  patientId   String
+  vaccine     String
+  dose        Int
+  dueDate     DateTime?
+  givenAt     DateTime?
+  batch       String?
+  status      String   @default("DUE")
+}
+
+model DialysisSession {
+  id          String   @id @default(uuid())
+  tenantId    String
+  patientId   String
+  visitId     String?
+  chair       String
+  machine     String?
+  scheduledAt DateTime
+  startedAt   DateTime?
+  endedAt     DateTime?
+  preVitals   Json?
+  postVitals  Json?
+  parameters  Json? // UF goal, blood flow, dialysate...
+  ktv         Float?
+  status      String   @default("SCHEDULED")
+  preauthId   String?
+}
+
+model HomeCareVisit {
+  id            String    @id @default(uuid())
+  tenantId      String
+  patientId     String
+  providerId    String
+  serviceType   String // NURSING, CAREGIVER, PHYSIO, COUNSELLING
+  scheduledAt   DateTime
+  checkInAt     DateTime?
+  checkInLat    Float?
+  checkInLng    Float?
+  checkOutAt    DateTime?
+  notes         String?
+  feeMinor      Int
+  escrowStatus  String    @default("HELD") // HELD, RELEASED, DISPUTED, REFUNDED
+  status        String    @default("BOOKED")
+}
+
+// ───────────────────────────── Pricing, billing, payments ─────────────────────────────
+
+model ServiceItem {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  category    String // CONSULTATION, LAB, IMAGING, PROCEDURE, BED, NURSING, THEATRE, PHARMACY, OTHER
+  departmentType String?
+  basePriceMinor Int
+  vatRate     Float    @default(0)
+  etimsItemCode String?
+  shaInterventionCode String?
+  active      Boolean  @default(true)
+
+  @@unique([tenantId, code])
+}
+
+model PriceList {
+  id         String          @id @default(uuid())
+  tenantId   String
+  name       String
+  payerType  String // CASH, SHA, INSURANCE, CORPORATE, STAFF
+  schemeId   String?
+  isDefault  Boolean         @default(false)
+  validFrom  DateTime        @default(now())
+  validTo    DateTime?
+  items      PriceListItem[]
+}
+
+model PriceListItem {
+  id          String    @id @default(uuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  serviceItemId String?
+  stockItemId String?
+  priceMinor  Int
+
+  @@unique([priceListId, serviceItemId, stockItemId])
+}
+
+model Payer {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String // SHA, INSURER, CORPORATE, GOVERNMENT
+  code        String?
+  integration String? // sha-hie, smart, slade360, manual
+  config      Json     @default("{}")
+  schemes     Scheme[]
+}
+
+model Scheme {
+  id          String        @id @default(uuid())
+  tenantId    String
+  payerId     String
+  payer       Payer         @relation(fields: [payerId], references: [id])
+  name        String
+  copayPercent Float        @default(0)
+  annualLimitMinor Int?
+  requiresPreauthAboveMinor Int?
+  covers      MemberCover[]
+}
+
+model MemberCover {
+  id            String   @id @default(uuid())
+  tenantId      String
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  schemeId      String
+  scheme        Scheme   @relation(fields: [schemeId], references: [id])
+  memberNumber  String
+  principalName String?
+  relationship  String   @default("SELF")
+  validFrom     DateTime?
+  validTo       DateTime?
+  active        Boolean  @default(true)
+}
+
+enum BillStatus {
+  OPEN
+  INTERIM
+  FINAL
+  PAID
+  PARTIALLY_PAID
+  VOID
+}
+
+model Bill {
+  id           String       @id @default(uuid())
+  tenantId     String
+  facilityId   String
+  visitId      String
+  visit        Visit        @relation(fields: [visitId], references: [id])
+  billNumber   String
+  currency     String       @default("KES")
+  status       BillStatus   @default(OPEN)
+  totalMinor   Int          @default(0)
+  discountMinor Int         @default(0)
+  payerAmountMinor Int      @default(0)
+  patientAmountMinor Int    @default(0)
+  paidMinor    Int          @default(0)
+  etimsInvoiceNo String?
+  etimsQr      String?
+  lines        BillLine[]
+  payments     Payment[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([tenantId, billNumber])
+}
+
+model BillLine {
+  id           String   @id @default(uuid())
+  tenantId     String
+  billId       String
+  bill         Bill     @relation(fields: [billId], references: [id])
+  sourceType   String // ORDER, PRESCRIPTION, BED, CONSULTATION, MANUAL, PACKAGE
+  sourceId     String?
+  serviceItemId String?
+  stockItemId  String?
+  description  String
+  quantity     Float    @default(1)
+  unitPriceMinor Int
+  totalMinor   Int
+  vatMinor     Int      @default(0)
+  payer        String   @default("PATIENT") // PATIENT, SCHEME
+  shaInterventionCode String?
+  voided       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  billId       String?
+  bill         Bill?    @relation(fields: [billId], references: [id])
+  receiptNumber String
+  method       String // CASH, MPESA, CARD, BANK, CHEQUE, WAIVER, AIRTEL, MOMO
+  amountMinor  Int
+  currency     String   @default("KES")
+  reference    String? // M-Pesa receipt, card auth...
+  status       String   @default("COMPLETED") // PENDING, COMPLETED, FAILED, REFUNDED
+  phone        String?
+  providerData Json?
+  cashierId    String?
+  shiftId      String?
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, reference])
+}
+
+model CashierShift {
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingFloat Int       @default(0)
+  declaredCash Int?
+  expectedCash Int?
+}
+
+// ───────────────────────────── Claims (SHA + insurers) ─────────────────────────────
+
+model EligibilityCheck {
+  id         String   @id @default(uuid())
+  tenantId   String
+  patientId  String
+  payer      String // SHA, or payer id
+  request    Json
+  response   Json?
+  eligible   Boolean?
+  fund       String?
+  reference  String?
+  createdAt  DateTime @default(now())
+}
+
+model PreAuth {
+  id           String   @id @default(uuid())
+  tenantId     String
+  visitId      String
+  payerId      String
+  interventionCode String?
+  description  String
+  amountMinor  Int
+  status       String   @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED, EXPIRED
+  externalRef  String?
+  approvedMinor Int?
+  response     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum ClaimStatus {
+  DRAFT
+  VALIDATED
+  PREAUTH_PENDING
+  SUBMITTED
+  IN_REVIEW
+  QUERIED
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PAID
+  RECONCILED
+}
+
+model Claim {
+  id            String       @id @default(uuid())
+  tenantId      String
+  facilityId    String
+  visitId       String
+  billId        String
+  payerId       String
+  claimNumber   String
+  status        ClaimStatus  @default(DRAFT)
+  totalMinor    Int
+  approvedMinor Int?
+  paidMinor     Int?
+  externalRef   String?
+  scrubIssues   Json         @default("[]") // [{code, severity, message}]
+  rejectionRisk Float?
+  rejectionReason String?
+  fhirBundle    Json?
+  submittedAt   DateTime?
+  decidedAt     DateTime?
+  lines         ClaimLine[]
+  events        ClaimEvent[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([tenantId, claimNumber])
+  @@index([tenantId, status])
+}
+
+model ClaimLine {
+  id           String  @id @default(uuid())
+  claimId      String
+  claim        Claim   @relation(fields: [claimId], references: [id])
+  billLineId   String?
+  code         String
+  description  String
+  quantity     Float
+  amountMinor  Int
+  approvedMinor Int?
+}
+
+model ClaimEvent {
+  id        String   @id @default(uuid())
+  claimId   String
+  claim     Claim    @relation(fields: [claimId], references: [id])
+  fromStatus String?
+  toStatus  String
+  note      String?
+  data      Json?
+  createdAt DateTime @default(now())
+}
+
+model Remittance {
+  id          String   @id @default(uuid())
+  tenantId    String
+  payerId     String
+  reference   String
+  amountMinor Int
+  paidAt      DateTime
+  lines       Json // [{claimNumber, externalRef, amountMinor}]
+  reconciled  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model ShaPackage {
+  id               String  @id @default(uuid())
+  fund             String // PHC, SHIF, ECCIF
+  code             String  @unique
+  name             String
+  tariffMinor      Int
+  minFacilityLevel Int     @default(2)
+  requiresPreauth  Boolean @default(false)
+  frequencyLimit   String? // e.g. "3/week", "1/year"
+  active           Boolean @default(true)
+}
+
+// ───────────────────────────── Inventory & procurement ─────────────────────────────
+
+model Store {
+  id         String   @id @default(uuid())
+  tenantId   String
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String
+  type       String   @default("MAIN") // MAIN, PHARMACY, WARD, LAB, THEATRE
+}
+
+model StockItem {
+  id            String   @id @default(uuid())
+  tenantId      String
+  code          String
+  name          String
+  genericName   String?
+  form          String?
+  strength      String?
+  category      String   @default("DRUG") // DRUG, CONSUMABLE, REAGENT, NON_MEDICAL
+  unit          String   @default("UNIT")
+  isControlled  Boolean  @default(false)
+  reorderLevel  Int      @default(0)
+  sellPriceMinor Int     @default(0)
+  vatRate       Float    @default(0)
+  productCode   String? // national product catalogue code
+  etimsItemCode String?
+  barcode       String?
+  active        Boolean  @default(true)
+  batches       StockBatch[]
+
+  @@unique([tenantId, code])
+}
+
+model StockBatch {
+  id          String    @id @default(uuid())
+  tenantId    String
+  itemId      String
+  item        StockItem @relation(fields: [itemId], references: [id])
+  storeId     String
+  batchNo     String
+  expiryDate  DateTime?
+  quantity    Int
+  unitCostMinor Int     @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, itemId, storeId, expiryDate])
+}
+
+model StockMovement {
+  id         String   @id @default(uuid())
+  tenantId   String
+  itemId     String
+  batchId    String?
+  fromStoreId String?
+  toStoreId  String?
+  type       String // RECEIPT, ISSUE, TRANSFER, DISPENSE, ADJUSTMENT, RETURN, EXPIRY
+  quantity   Int
+  reference  String?
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, itemId, createdAt])
+}
+
+model Supplier {
+  id        String  @id @default(uuid())
+  tenantId  String
+  name      String
+  kraPin    String?
+  phone     String?
+  email     String?
+  terms     String?
+}
+
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  tenantId    String
+  facilityId  String
+  supplierId  String
+  number      String
+  status      String   @default("DRAFT") // REQUISITION, DRAFT, PENDING_APPROVAL, APPROVED, SENT, PARTIAL, RECEIVED, CANCELLED
+  lines       Json // [{itemId, quantity, unitCostMinor, received}]
+  totalMinor  Int      @default(0)
+  approvals   Json     @default("[]")
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, number])
+}
+
+// ───────────────────────────── Finance, HR, assets, budgets ─────────────────────────────
+
+model Account {
+  id       String  @id @default(uuid())
+  tenantId String
+  code     String
+  name     String
+  type     String // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  parentId String?
+
+  @@unique([tenantId, code])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  date        DateTime @default(now())
+  reference   String?
+  sourceType  String? // BILL, PAYMENT, GRN, PAYROLL, MANUAL
+  sourceId    String?
+  memo        String?
+  lines       Json // [{accountCode, debitMinor, creditMinor, costCentre}]
+  postedBy    String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, date])
+}
+
+model Employee {
+  id            String   @id @default(uuid())
+  tenantId      String
+  userId        String?
+  staffNo       String
+  firstName     String
+  lastName      String
+  idNumber      String?
+  kraPin        String?
+  nssfNo        String?
+  shifNo        String?
+  department    String?
+  designation   String?
+  basicSalaryMinor Int  @default(0)
+  allowances    Json     @default("[]")
+  bankDetails   Json?
+  hireDate      DateTime?
+  active        Boolean  @default(true)
+
+  @@unique([tenantId, staffNo])
+}
+
+model LeaveRequest {
+  id         String   @id @default(uuid())
+  tenantId   String
+  employeeId String
+  type       String
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+}
+
+model PayrollRun {
+  id        String   @id @default(uuid())
+  tenantId  String
+  period    String // 2026-10
+  status    String   @default("DRAFT")
+  payslips  Json // computed payslips
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, period])
+}
+
+model Asset {
+  id             String    @id @default(uuid())
+  tenantId       String
+  facilityId     String
+  tag            String
+  name           String
+  category       String
+  purchaseDate   DateTime?
+  costMinor      Int       @default(0)
+  usefulLifeYears Int      @default(5)
+  location       String?
+  status         String    @default("IN_USE")
+  nextServiceAt  DateTime?
+
+  @@unique([tenantId, tag])
+}
+
+model Budget {
+  id         String   @id @default(uuid())
+  tenantId   String
+  year       Int
+  department String
+  lines      Json // [{accountCode, amountMinor}]
+  status     String   @default("DRAFT")
+}
+
+// ───────────────────────────── Integration plumbing ─────────────────────────────
+
+model IntegrationMessage {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  adapter     String // sha, mpesa, etims, dhis2, sms
+  operation   String
+  direction   String   @default("OUT")
+  idempotencyKey String?
+  status      String   @default("PENDING") // PENDING, SENT, SUCCESS, FAILED, DEAD
+  attempts    Int      @default(0)
+  request     Json?
+  response    Json?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, adapter, status])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  channel   String // SMS, EMAIL, WHATSAPP, IN_APP
+  to        String
+  body      String
+  status    String   @default("QUEUED")
+  createdAt DateTime @default(now())
+}
+
+model Sequence {
+  tenantId String
+  name     String
+  value    Int    @default(0)
+
+  @@id([tenantId, name])
+}
