@@ -1,0 +1,46 @@
+// JMSURF HMIS — back-office additions (quality & governance)
+
+model Incident {
+  id            String    @id @default(uuid())
+  tenantId      String
+  facilityId    String?
+  number        String
+  occurredAt    DateTime
+  location      String?
+  category      String // MEDICATION_ERROR, FALL, NEEDLESTICK, EQUIPMENT, INFECTION, OTHER
+  severity      String    @default("LOW") // NEAR_MISS, LOW, MODERATE, SEVERE, DEATH
+  description   String
+  patientId     String?
+  reportedById  String?
+  status        String    @default("REPORTED") // REPORTED, INVESTIGATING, CLOSED
+  investigatorId String?
+  findings      String?
+  actions       String?
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+}
+
+model Complaint {
+  id            String    @id @default(uuid())
+  tenantId      String
+  number        String
+  complainant   String
+  phone         String?
+  patientId     String?
+  channel       String    @default("IN_PERSON") // IN_PERSON, PHONE, EMAIL, SMS, SUGGESTION_BOX
+  category      String    @default("SERVICE") // SERVICE, BILLING, CLINICAL, STAFF_CONDUCT, FACILITY, OTHER
+  description   String
+  status        String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  assignedToId  String?
+  resolution    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+}
