@@ -470,3 +470,30 @@
 @media (min-width: 1024px) { .portal-main { padding-bottom: 40px; } }
 
 .portal > .glass-bubbles { position: fixed; }
+
+/* Hospital motion: drifting medical icons, heart-monitor trace, beating stethoscope. Off for reduced motion (rule above). */
+.med-float { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.med-float > span { position: absolute; color: var(--brand); opacity: .13; transform: rotate(var(--r, 0deg)); animation: medDrift 14s ease-in-out infinite; }
+:root.dark .med-float > span { opacity: .16; color: #ff8c99; }
+.med-float.light > span { color: #fff; opacity: .16; }
+.med-float > span:nth-child(3n) { animation-duration: 18s; }
+.med-float > span:nth-child(3n+1) { animation-duration: 11s; }
+.ecg { display: block; width: 100%; height: 64px; overflow: visible; }
+.ecg path { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ecg-base { stroke: var(--brand); stroke-opacity: .14; stroke-width: 2; }
+.ecg-trace { stroke: var(--brand); stroke-width: 2.6; stroke-dasharray: .22 1; stroke-dashoffset: 1.22; animation: ecgSweep 3.2s linear infinite; filter: drop-shadow(0 0 6px rgb(189 35 50 / .55)); }
+.ecg.light .ecg-base { stroke: #fff; stroke-opacity: .22; }
+.ecg.light .ecg-trace { stroke: #fff; filter: drop-shadow(0 0 6px rgb(255 255 255 / .8)); }
+.steth { width: 100%; height: auto; overflow: visible; }
+.steth-tube { stroke: currentColor; stroke-width: 7; stroke-linecap: round; opacity: .9; }
+.steth-ear { fill: currentColor; }
+.steth-bell { fill: currentColor; opacity: .95; }
+.steth-disc { fill: var(--brand); opacity: .55; }
+.steth-head { transform-origin: 160px 172px; animation: heartBeat 1.2s ease-in-out infinite; }
+.steth-ring { stroke: currentColor; stroke-width: 3; fill: none; transform-origin: 160px 172px; animation: beatRing 1.2s ease-out infinite; }
+.steth-heart { fill: #fff; transform-origin: 160px 172px; animation: heartBeat 1.2s ease-in-out infinite; }
+.lp-hero-art { position: absolute; inset: -40px -20px; pointer-events: none; }
+@keyframes medDrift { 0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--r, 0deg)); } 50% { transform: translate3d(10px, -22px, 0) rotate(calc(var(--r, 0deg) + 10deg)); } }
+@keyframes ecgSweep { to { stroke-dashoffset: 0; } }
+@keyframes heartBeat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.12); } 30% { transform: scale(.97); } 45% { transform: scale(1.07); } }
+@keyframes beatRing { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(1.9); opacity: 0; } }

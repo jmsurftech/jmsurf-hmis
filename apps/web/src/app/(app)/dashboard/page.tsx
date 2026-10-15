@@ -8,6 +8,7 @@ import { Card, EmptyState, ErrorNote, humanize, StatCard } from '@/components/ui
 import { useGet } from '@/lib/hooks';
 import { money } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
+import { EcgLine, MedicalFloat, StethoscopeArt } from '@/components/MedicalArt';
 
 interface Dashboard {
   showMoney?: boolean; visitsToday?: number; revenueTodayMinor?: number | null; revenueMonthMinor?: number | null;
@@ -55,6 +56,9 @@ export default function DashboardPage() {
       <div className="hero-card">
         <span className="orb" style={{ width: 380, height: 380, background: '#ff9aa6', top: -150, right: -60 }} />
         <span className="orb" style={{ width: 240, height: 240, background: '#ffc2a8', bottom: -120, left: '30%' }} />
+        <MedicalFloat tone="light" count={7} />
+        <div className="pointer-events-none absolute bottom-3 right-6 hidden w-24 text-white/90 md:block lg:right-[38%]" style={{ transform: 'rotate(-10deg)' }}><StethoscopeArt /></div>
+        <EcgLine tone="light" className="pointer-events-none absolute inset-x-0 bottom-0 opacity-70" />
         <div className="relative flex flex-wrap items-end justify-between gap-5">
           <div className="min-w-0">
             <span className="chipw"><span className="live-dot" />{new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>

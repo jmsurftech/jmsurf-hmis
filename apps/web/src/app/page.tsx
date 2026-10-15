@@ -1,3 +1,4 @@
+import { EcgLine, MedicalFloat, StethoscopeArt } from '@/components/MedicalArt';
 import Link from 'next/link';
 import {
   Activity, ArrowRight, Baby, Banknote, BarChart3, BedDouble, Building2, Check, ClipboardCheck, CloudOff, Droplets, FileCheck2, FlaskConical, HeartPulse, Home,
@@ -62,8 +63,9 @@ export default function Landing() {
         </header>
 
         {/* Hero */}
-        <section className="lp-sec grid items-center gap-12 pt-14 lg:grid-cols-[1.05fr_1fr] lg:pt-20">
-          <div>
+        <section className="lp-sec relative grid items-center gap-12 pt-14 lg:grid-cols-[1.05fr_1fr] lg:pt-20">
+          <MedicalFloat className="lp-hero-art" />
+          <div className="relative">
             <span className="lp-eyebrow"><HeartPulse className="h-4 w-4" />Hospital management for Kenya and Africa</span>
             <h1 className="lp-h1 mt-6">Certified-ready.<br /><span className="gradtext">Paid faster.</span><br />Works offline.</h1>
             <p className="lp-lead mt-6 max-w-xl">JMSURF HMIS runs your whole facility, from the front desk to the claims office: every department, every payer and every MOH report in one place.</p>
@@ -75,8 +77,12 @@ export default function Landing() {
               {['SHA, Client Registry and KMHFR', 'KRA eTIMS', 'M-Pesa STK and Paybill', 'DHIS2 / KHIS'].map((x) => <span key={x} className="flex items-center gap-2"><Check className="h-4 w-4 text-brand" />{x}</span>)}
             </div>
           </div>
-          <HeroMock />
+          <div className="relative">
+            <div className="pointer-events-none absolute -bottom-16 -left-16 z-[2] hidden w-28 text-brand xl:block" style={{ transform: 'rotate(-14deg)' }}><StethoscopeArt /></div>
+            <HeroMock />
+          </div>
         </section>
+        <div className="mx-auto -mt-4 max-w-[1200px] px-0 sm:px-5"><EcgLine /></div>
 
         {/* Stats band */}
         <section className="mx-auto grid max-w-[1200px] grid-cols-2 gap-4 px-0 pb-6 sm:px-5 md:grid-cols-4">

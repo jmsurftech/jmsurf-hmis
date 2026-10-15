@@ -1,5 +1,5 @@
 /**
- * Idempotent demo seed: "Demo Mission Hospital" (slug: demo).
+ * Idempotent demo seed: "JMSURF HMIS Demo Hospital" (slug: demo).
  * Run: pnpm seed  (from apps/api). Safe to re-run — rows are matched by natural keys and skipped/updated.
  */
 import { PrismaClient, Prisma } from '@prisma/client';
@@ -41,20 +41,20 @@ const WARDS: { name: string; type: string; beds: number; rateCode: string }[] = 
 
 const STORES: [string, string][] = [['Main Store', 'MAIN'], ['Pharmacy', 'PHARMACY'], ['Laboratory Store', 'LAB'], ['Theatre Store', 'THEATRE'], ['Ward Store', 'WARD']];
 
-const USERS: { email: string; first: string; last: string; roles: string[]; cadre?: string; regulator?: string; specialty?: string; salary: number; designation: string; dept: string }[] = [
-  { email: 'admin', first: 'Grace', last: 'Wanjiru', roles: ['ADMIN', 'MANAGER'], salary: 180000, designation: 'Hospital Administrator', dept: 'Administration' },
-  { email: 'doctor', first: 'James', last: 'Otieno', roles: ['DOCTOR'], cadre: 'DOCTOR', regulator: 'KMPDC', specialty: 'General Medicine', salary: 350000, designation: 'Medical Officer', dept: 'Outpatient (OPD)' },
-  { email: 'nurse', first: 'Mercy', last: 'Chebet', roles: ['NURSE', 'TRIAGE_NURSE'], cadre: 'NURSE', regulator: 'NCK', salary: 95000, designation: 'Nursing Officer', dept: 'Inpatient Wards' },
-  { email: 'lab', first: 'Peter', last: 'Kamau', roles: ['LAB_TECH'], cadre: 'LAB_TECH', regulator: 'KMLTTB', salary: 85000, designation: 'Medical Laboratory Technologist', dept: 'Laboratory' },
-  { email: 'pharmacy', first: 'Aisha', last: 'Mohamed', roles: ['PHARMACIST'], cadre: 'PHARMACIST', regulator: 'PPB', salary: 140000, designation: 'Pharmacist', dept: 'Pharmacy' },
-  { email: 'cashier', first: 'Brian', last: 'Mwangi', roles: ['CASHIER', 'RECEPTION'], salary: 45000, designation: 'Cashier', dept: 'Finance' },
-  { email: 'claims', first: 'Faith', last: 'Njeri', roles: ['CLAIMS_OFFICER'], salary: 70000, designation: 'Claims Officer', dept: 'Finance' },
-  { email: 'store', first: 'Daniel', last: 'Kiprop', roles: ['STOREKEEPER', 'PROCUREMENT'], salary: 55000, designation: 'Storekeeper', dept: 'Administration' },
-  { email: 'accounts', first: 'Esther', last: 'Achieng', roles: ['ACCOUNTANT'], salary: 120000, designation: 'Accountant', dept: 'Finance' },
-  { email: 'hr', first: 'Samuel', last: 'Mutua', roles: ['HR'], salary: 110000, designation: 'HR Officer', dept: 'Human Resources' },
-  { email: 'reception', first: 'Lucy', last: 'Atieno', roles: ['RECEPTION'], salary: 38000, designation: 'Receptionist', dept: 'Outpatient (OPD)' },
-  { email: 'co', first: 'Kevin', last: 'Omondi', roles: ['CLINICAL_OFFICER'], cadre: 'CLINICAL_OFFICER', regulator: 'COC', salary: 110000, designation: 'Clinical Officer', dept: 'Accident & Emergency' },
-  { email: 'radiology', first: 'Ruth', last: 'Wambui', roles: ['RADIOGRAPHER'], cadre: 'RADIOGRAPHER', regulator: 'SRRB', salary: 90000, designation: 'Radiographer', dept: 'Radiology' },
+const USERS: { email: string; roles: string[]; cadre?: string; regulator?: string; specialty?: string; salary: number; designation: string; dept: string }[] = [
+  { email: 'admin', roles: ['ADMIN', 'MANAGER'], salary: 180000, designation: 'Hospital Administrator', dept: 'Administration' },
+  { email: 'doctor', roles: ['DOCTOR'], cadre: 'DOCTOR', regulator: 'KMPDC', specialty: 'General Medicine', salary: 350000, designation: 'Medical Officer', dept: 'Outpatient (OPD)' },
+  { email: 'nurse', roles: ['NURSE', 'TRIAGE_NURSE'], cadre: 'NURSE', regulator: 'NCK', salary: 95000, designation: 'Nursing Officer', dept: 'Inpatient Wards' },
+  { email: 'lab', roles: ['LAB_TECH'], cadre: 'LAB_TECH', regulator: 'KMLTTB', salary: 85000, designation: 'Medical Laboratory Technologist', dept: 'Laboratory' },
+  { email: 'pharmacy', roles: ['PHARMACIST'], cadre: 'PHARMACIST', regulator: 'PPB', salary: 140000, designation: 'Pharmacist', dept: 'Pharmacy' },
+  { email: 'cashier', roles: ['CASHIER', 'RECEPTION'], salary: 45000, designation: 'Cashier', dept: 'Finance' },
+  { email: 'claims', roles: ['CLAIMS_OFFICER'], salary: 70000, designation: 'Claims Officer', dept: 'Finance' },
+  { email: 'store', roles: ['STOREKEEPER', 'PROCUREMENT'], salary: 55000, designation: 'Storekeeper', dept: 'Administration' },
+  { email: 'accounts', roles: ['ACCOUNTANT'], salary: 120000, designation: 'Accountant', dept: 'Finance' },
+  { email: 'hr', roles: ['HR'], salary: 110000, designation: 'HR Officer', dept: 'Human Resources' },
+  { email: 'reception', roles: ['RECEPTION'], salary: 38000, designation: 'Receptionist', dept: 'Outpatient (OPD)' },
+  { email: 'co', roles: ['CLINICAL_OFFICER'], cadre: 'CLINICAL_OFFICER', regulator: 'COC', salary: 110000, designation: 'Clinical Officer', dept: 'Accident & Emergency' },
+  { email: 'radiology', roles: ['RADIOGRAPHER'], cadre: 'RADIOGRAPHER', regulator: 'SRRB', salary: 90000, designation: 'Radiographer', dept: 'Radiology' },
 ];
 
 // [code, name, category, departmentType, priceKES, shaCode?]
@@ -346,9 +346,6 @@ const DIAGNOSES: { code: string; display: string; w: number; lab?: string; drug?
   { code: '9A60', display: 'Conjunctivitis', w: 2, drug: 'CHLOREYE', kids: true },
 ];
 
-const FIRST_M = ['John', 'Peter', 'David', 'Joseph', 'Daniel', 'Samuel', 'Paul', 'Moses', 'Brian', 'Kevin', 'Collins', 'Dennis', 'Felix', 'Victor', 'Ian', 'Hassan', 'Omar', 'Wycliffe', 'Kelvin', 'Amos'];
-const FIRST_F = ['Mary', 'Grace', 'Faith', 'Joyce', 'Mercy', 'Esther', 'Ann', 'Jane', 'Lucy', 'Sarah', 'Ruth', 'Purity', 'Caroline', 'Winnie', 'Zawadi', 'Amina', 'Fatuma', 'Beatrice', 'Diana', 'Naliaka'];
-const LAST = ['Kamau', 'Otieno', 'Wanjiku', 'Mwangi', 'Ochieng', 'Kiprotich', 'Njoroge', 'Achieng', 'Mutua', 'Wafula', 'Chebet', 'Kibet', 'Omondi', 'Njeri', 'Ali', 'Barasa', 'Juma', 'Muthoni', 'Korir', 'Wekesa'];
 const COUNTIES = ['Nairobi', 'Kiambu', 'Machakos', 'Nakuru', 'Kisumu', 'Kajiado', 'Murang\'a'];
 
 async function main() {
@@ -357,21 +354,21 @@ async function main() {
   // ── Tenant & facility
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },
-    update: {},
+    update: { name: 'JMSURF HMIS Demo Hospital', settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012' } },
     create: {
-      name: 'Demo Mission Hospital', slug: 'demo', countryCode: 'KE', currency: 'KES', plan: 'HOSPITAL', subscriptionStatus: 'ACTIVE',
+      name: 'JMSURF HMIS Demo Hospital', slug: 'demo', countryCode: 'KE', currency: 'KES', plan: 'HOSPITAL', subscriptionStatus: 'ACTIVE',
       primaryColor: '#0f766e', kraPin: 'P051234567X',
       enabledModules: ['patients', 'opd', 'triage', 'lab', 'radiology', 'pharmacy', 'ipd', 'maternity', 'theatre', 'dialysis', 'billing', 'claims', 'inventory', 'procurement', 'finance', 'hr', 'assets', 'reports', 'telemedicine', 'homecare', 'quality'],
-      settings: { receiptFooter: 'Asante kwa kuchagua Demo Mission Hospital', dhis2OrgUnit: '14012' },
+      settings: { receiptFooter: 'Asante kwa kuchagua JMSURF HMIS Demo Hospital', dhis2OrgUnit: '14012' },
     },
   });
   const T = tenant.id;
   const facility = await prisma.facility.upsert({
     where: { tenantId_code: { tenantId: T, code: 'MAIN' } },
-    update: {},
+    update: { name: 'JMSURF HMIS Demo Hospital - Main', phone: null },
     create: {
-      tenantId: T, name: 'Demo Mission Hospital - Main', code: 'MAIN', kmhflCode: '14012', shaFacilityId: 'FID-14012', level: 4,
-      county: 'Kiambu', address: 'Thika Road, Kiambu', phone: '+254700000000', email: 'info@demo.jmsurf.health',
+      tenantId: T, name: 'JMSURF HMIS Demo Hospital - Main', code: 'MAIN', kmhflCode: '14012', shaFacilityId: 'FID-14012', level: 4,
+      county: 'Kiambu', address: 'Thika Road, Kiambu', phone: null, email: 'info@demo.jmsurf.health',
     },
   });
   const F = facility.id;
@@ -444,8 +441,8 @@ async function main() {
     const email = `${u.email}@demo.jmsurf.health`;
     const user = await prisma.user.upsert({
       where: { email },
-      update: { passwordHash, roles: u.roles, active: true },
-      create: { tenantId: T, email, passwordHash, firstName: u.first, lastName: u.last, roles: u.roles, facilityIds: [F], phone: `+2547${String(10000000 + staffNo * 1234567).slice(0, 8)}` },
+      update: { passwordHash, roles: u.roles, active: true, firstName: 'Demo', lastName: u.designation, phone: null },
+      create: { tenantId: T, email, passwordHash, firstName: 'Demo', lastName: u.designation, roles: u.roles, facilityIds: [F] },
     });
     users[u.email] = user.id;
     if (u.cadre) {
@@ -465,7 +462,7 @@ async function main() {
       where: { tenantId_staffNo: { tenantId: T, staffNo: no } },
       update: {},
       create: {
-        tenantId: T, userId: user.id, staffNo: no, firstName: u.first, lastName: u.last, idNumber: String(20000000 + staffNo * 7919),
+        tenantId: T, userId: user.id, staffNo: no, firstName: 'Demo', lastName: u.designation, idNumber: String(20000000 + staffNo * 7919),
         kraPin: `A00${String(1000000 + staffNo * 3571).slice(0, 7)}${String.fromCharCode(65 + (staffNo % 26))}`, nssfNo: String(900000 + staffNo), shifNo: `SHA${700000 + staffNo}`,
         department: u.dept, designation: u.designation, basicSalaryMinor: KES(u.salary),
         allowances: [{ name: 'House allowance', amountMinor: KES(Math.round(u.salary * 0.15)) }, { name: 'Commuter allowance', amountMinor: KES(5000) }, ...(staffNo % 4 === 0 ? [{ name: 'HELB', amountMinor: KES(2500), deduction: true }] : [])],
@@ -476,9 +473,9 @@ async function main() {
   }
   // non-system-user staff
   for (const [first, last, designation, dept, salary] of [
-    ['Joseph', 'Kariuki', 'Cleaner', 'Administration', 22000], ['Agnes', 'Moraa', 'Enrolled Nurse', 'Maternity', 60000],
-    ['Tom', 'Wekesa', 'Driver', 'Administration', 30000], ['Rose', 'Nyambura', 'Cook', 'Administration', 25000],
-    ['Patrick', 'Langat', 'Security Officer', 'Administration', 24000],
+    ['Employee', '0101', 'Cleaner', 'Administration', 22000], ['Employee', '0102', 'Enrolled Nurse', 'Maternity', 60000],
+    ['Employee', '0103', 'Driver', 'Administration', 30000], ['Employee', '0104', 'Cook', 'Administration', 25000],
+    ['Employee', '0105', 'Security Officer', 'Administration', 24000],
   ] as [string, string, string, string, number][]) {
     const no = `EMP${String(staffNo).padStart(4, '0')}`;
     await prisma.employee.upsert({
@@ -594,19 +591,19 @@ async function main() {
     const child = p % 4 === 0; // ~25% under five
     const age = child ? int(0, 4) : int(5, 80);
     const dob = new Date(Date.UTC(new Date().getUTCFullYear() - age, int(0, 11), int(1, 28)));
-    const first = sex === 'FEMALE' ? pick(FIRST_F) : pick(FIRST_M);
-    const last = pick(LAST);
+    // Role labels only: demo data must never look like real people.
+    const first = 'Patient'; const last = String(p).padStart(4, '0');
     const payerCode = p % 10 < 5 ? 'CASH' : p % 10 < 8 ? 'SHA' : pick(['JUB', 'AAR', 'BRT']);
     const mrn = `DMH-${String(p).padStart(5, '0')}`;
     const patient = await prisma.patient.upsert({
       where: { tenantId_mrn: { tenantId: T, mrn } },
-      update: {},
+      update: { firstName: first, lastName: last, middleName: null, phone: null, email: p === 1 ? 'patient@demo.jmsurf.health' : null, nextOfKin: [{ name: 'Next of kin', relationship: child ? 'MOTHER' : 'SPOUSE' }] },
       create: {
-        tenantId: T, mrn, firstName: first, lastName: last, middleName: rnd() < 0.5 ? pick(LAST) : null, sex: sex as any, dateOfBirth: dob,
+        tenantId: T, mrn, firstName: first, lastName: last, middleName: null, email: p === 1 ? 'patient@demo.jmsurf.health' : null, sex: sex as any, dateOfBirth: dob,
         idType: child ? 'BIRTH_CERT' : 'NATIONAL_ID', idNumber: child ? `BC${3000000 + p}` : String(25000000 + p * 104729),
-        phone: `+2547${String(11000000 + p * 271828).slice(0, 8)}`, county: pick(COUNTIES), shaNumber: payerCode === 'SHA' ? `SHA${8000000 + p}` : null,
+        phone: null, county: pick(COUNTIES), shaNumber: payerCode === 'SHA' ? `SHA${8000000 + p}` : null,
         crId: payerCode === 'SHA' ? `CR${5000000 + p}` : null, maritalStatus: child ? null : pick(['SINGLE', 'MARRIED', 'MARRIED', 'WIDOWED']),
-        nextOfKin: [{ name: `${pick(FIRST_F)} ${last}`, relationship: child ? 'MOTHER' : 'SPOUSE', phone: `+2547${String(22000000 + p * 31337).slice(0, 8)}` }],
+        nextOfKin: [{ name: 'Next of kin', relationship: child ? 'MOTHER' : 'SPOUSE' }],
       },
     });
     if (p % 7 === 0 && (await prisma.allergy.count({ where: { patientId: patient.id } })) === 0) {
@@ -882,11 +879,15 @@ async function main() {
       ],
     });
   }
+  // Patient portal demo login for Patient 0001 (email above, same demo password).
+  const portalPt = await prisma.patient.findUnique({ where: { tenantId_mrn: { tenantId: T, mrn: 'DMH-00001' } } });
+  if (portalPt) await prisma.portalAccount.upsert({ where: { patientId: portalPt.id }, update: { passwordHash }, create: { tenantId: T, patientId: portalPt.id, passwordHash } });
+
   if ((await prisma.complaint.count({ where: { tenantId: T } })) === 0) {
     await prisma.complaint.createMany({
       data: [
-        { tenantId: T, number: 'CMP-DEMO-0001', complainant: 'Mary Wanjiku', phone: '+254711000111', channel: 'SUGGESTION_BOX', category: 'SERVICE', description: 'Long waiting time at the pharmacy on Saturday.', status: 'RESOLVED', resolution: 'Added a second dispenser on weekends.', resolvedAt: new Date(now - 4 * DAY) },
-        { tenantId: T, number: 'CMP-DEMO-0002', complainant: 'John Otieno', phone: '+254722000222', channel: 'PHONE', category: 'BILLING', description: 'Charged twice for consultation.', status: 'IN_PROGRESS', assignedToId: users.accounts },
+        { tenantId: T, number: 'CMP-DEMO-0001', complainant: 'Patient 0003', phone: null, channel: 'SUGGESTION_BOX', category: 'SERVICE', description: 'Long waiting time at the pharmacy on Saturday.', status: 'RESOLVED', resolution: 'Added a second dispenser on weekends.', resolvedAt: new Date(now - 4 * DAY) },
+        { tenantId: T, number: 'CMP-DEMO-0002', complainant: 'Patient 0008', phone: null, channel: 'PHONE', category: 'BILLING', description: 'Charged twice for consultation.', status: 'IN_PROGRESS', assignedToId: users.accounts },
       ],
     });
   }

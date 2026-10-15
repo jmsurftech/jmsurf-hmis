@@ -137,6 +137,8 @@ export class PortalService {
   }
 
   async setPassword(p: PortalUser, dto: SetPasswordDto) {
+    const pt = await this.prisma.patient.findUnique({ where: { id: p.sub }, select: { email: true } });
+    if (pt?.email?.endsWith('@demo.jmsurf.health')) throw new BadRequestException('The demo patient cannot change its password');
     const passwordHash = await bcrypt.hash(dto.password, 10);
     await this.prisma.portalAccount.upsert({ where: { patientId: p.sub }, update: { passwordHash }, create: { tenantId: p.tenantId, patientId: p.sub, passwordHash } });
     await this.audit.log({ tenantId: p.tenantId, action: 'PORTAL_SET_PASSWORD', entity: 'Patient', entityId: p.sub });

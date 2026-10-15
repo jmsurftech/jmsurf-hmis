@@ -60,6 +60,10 @@ const DEFAULT_MODULES = [
   'billing', 'claims', 'inventory', 'procurement', 'finance', 'hr', 'assets', 'reports', 'telemedicine', 'homecare',
 ];
 
+/** Public demo logins share one password, so they cannot change it. */
+export const isDemoEmail = (e: string) => e.toLowerCase().endsWith('@demo.jmsurf.health');
+const superAdminEmails = () => (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService, private jwt: JwtService, private audit: AuditService, private mail: MailService) {}
@@ -80,7 +84,9 @@ export class AuthService {
       const t = await this.prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { suspendedAt: true } });
       if (t?.suspendedAt) throw new UnauthorizedException('This facility account is suspended. Contact JMSURF support.');
     }
-    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const flag = !user.isSuperAdmin && superAdminEmails().includes(user.email);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), ...(flag ? { isSuperAdmin: true } : {}) } });
+    if (flag) user.isSuperAdmin = true;
     await this.audit.log({ tenantId: user.tenantId ?? undefined, userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id });
     return { accessToken: this.sign(user), user: this.publicUser(user) };
   }
@@ -119,7 +125,7 @@ export class AuthService {
       return tx.user.create({
         data: {
           tenantId: tenant.id, email, phone: dto.phone, passwordHash, firstName: dto.firstName, lastName: dto.lastName,
-          roles: ['ADMIN'], facilityIds: [facility.id],
+          roles: ['ADMIN'], facilityIds: [facility.id], isSuperAdmin: superAdminEmails().includes(email),
         },
       });
     });
@@ -143,6 +149,7 @@ export class AuthService {
 
   async changePassword(u: AuthUser, dto: ChangePasswordDto) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: u.sub } });
+    if (isDemoEmail(user.email)) throw new BadRequestException('Demo accounts cannot change their password');
     if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) throw new BadRequestException('Your current password is not correct');
     await this.prisma.user.update({ where: { id: u.sub }, data: { passwordHash: await bcrypt.hash(dto.newPassword, 10) } });
     await this.audit.log({ tenantId: u.tenantId || undefined, userId: u.sub, action: 'CHANGE_PASSWORD', entity: 'User', entityId: u.sub });
@@ -154,7 +161,7 @@ export class AuthService {
 
   async forgot(dto: ForgotDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
-    if (user?.active) {
+    if (user?.active && !isDemoEmail(user.email)) {
       const token = this.jwt.sign({ sub: user.id, purpose: 'reset', k: this.resetKey(user.passwordHash) }, { expiresIn: '1h' });
       const url = `${this.webUrl()}/reset-password?token=${encodeURIComponent(token)}`;
       await this.mail.send(user.email, 'Reset your JMSURF HMIS password', this.mail.layout('Reset your password',

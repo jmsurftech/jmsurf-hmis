@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Banknote, CloudOff, ShieldCheck, Stethoscope } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { MedicalFloat } from './MedicalArt';
 
 const POINTS = [
   { icon: ShieldCheck, t: 'SHA-native', d: 'Eligibility, pre-auth and claims in the normal workflow.' },
@@ -16,6 +17,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
       <div className="glass-bubbles" aria-hidden>{[[60, 6, 200, 0], [90, 60, 160, 4], [52, 80, 120, 8]].map(([l, t, s, d]) => <span key={`${l}-${t}`} style={{ left: `${l}%`, top: `${t}%`, width: s, height: s, animationDelay: `-${d}s` }} />)}</div>
       <aside className="auth-art">
         <span className="orb" style={{ width: 420, height: 420, background: '#ff9aa6', top: -160, right: -120 }} />
+        <MedicalFloat tone="light" count={8} />
         <Link href="/" className="relative flex items-center gap-3 text-white no-underline">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-lg"><img src="/hmis-logo.svg" alt="" className="h-9 w-9" /></span>
           <span><b className="block text-lg font-extrabold">JMSURF HMIS</b><small className="text-white/80">Hospital management</small></span>
