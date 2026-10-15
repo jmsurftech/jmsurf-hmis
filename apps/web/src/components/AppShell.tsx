@@ -1,84 +1,167 @@
 'use client';
-import { HeartPulse, LogOut, Menu, Moon, Search, Sun, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Moon, RefreshCw, Search, Settings, Sun, UserCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { useList } from '@/lib/hooks';
-import { NAV } from '@/lib/nav';
+import { useGet, useList } from '@/lib/hooks';
+import { BOTTOM, NAV, type NavItem } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { CommandPalette } from './CommandPalette';
-import { Loading } from './ui';
+import { Avatar, Loading } from './ui';
 
-export function Logo({ className }: { className?: string }) {
-  return <span className={cn('flex items-center gap-2 font-semibold', className)}><span className="rounded-lg bg-gradient-to-br from-primary-500 to-brand-blue p-1.5 text-white"><HeartPulse className="h-4 w-4" /></span>JMSURF <span className="text-primary-600 dark:text-primary-400">HMIS</span></span>;
+export function Logo({ className, sub }: { className?: string; sub?: string }) {
+  return (
+    <span className={cn('brandrow', className)}>
+      <span className="brand-logo"><img src="/hmis-logo.svg" alt="" /></span>
+      <span className="min-w-0"><b>JMSURF HMIS</b><small>{sub ?? 'Hospital management'}</small></span>
+    </span>
+  );
 }
+
+export function PoweredBy({ className }: { className?: string }) {
+  return <div className={cn('powered', className)}>JMSURF HMIS · Powered by <b>JMSURF TECHNOLOGIES</b></div>;
+}
+
+const BUBBLES: [number, number, number, number][] = [[-4, 8, 220, 0], [86, -6, 260, 3], [70, 62, 180, 6], [8, 74, 140, 9], [42, 88, 110, 4], [94, 40, 90, 11]];
+const isActive = (path: string, href: string) => (href === '/admin' ? path === '/admin' : path === href || path.startsWith(href + '/'));
+function readClosed(): Record<string, boolean> { try { return JSON.parse(localStorage.getItem('hmis.nav.closed') || '{}'); } catch { return {}; } }
 
 function FacilitySwitcher() {
   const { facilityId, setFacility, user, hasRole } = useAuth();
-  const { data } = useList<any>('/admin/facilities', {}, hasRole('MANAGER'));
+  const { data } = useList<any>('/admin/facilities', {}, hasRole('MANAGER', 'RECEPTION', 'DOCTOR', 'NURSE', 'CASHIER'));
   const list = (data?.data ?? []).filter((f: any) => !user?.facilityIds?.length || user.facilityIds.includes(f.id) || user.roles.includes('ADMIN'));
-  if (!list.length) return null;
+  if (list.length < 2) return null;
   return (
-    <select className="input w-auto max-w-[12rem] py-1.5" value={facilityId ?? ''} onChange={(e) => { setFacility(e.target.value); window.location.reload(); }} aria-label="Facility">
+    <select className="fac-select hide-sm" value={facilityId ?? ''} onChange={(e) => { setFacility(e.target.value); window.location.reload(); }} aria-label="Facility">
       {list.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
     </select>
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout, hasRole } = useAuth();
-  const router = useRouter(); const path = usePathname();
-  const { dark, toggle } = useTheme();
-  const [mobile, setMobile] = useState(false); const [palette, setPalette] = useState(false);
-  useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(path)}`); }, [loading, user, router, path]);
-  useEffect(() => setMobile(false), [path]);
-  const groups = useMemo(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole]);
-  if (loading || !user) return <div className="flex h-screen items-center justify-center"><Loading /></div>;
-
-  const isActive = (href: string) => href === '/admin' ? path === '/admin' : path === href || path.startsWith(href + '/');
-  const sidebar = (
-    <nav className="flex h-full flex-col">
-      <div className="flex h-14 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800"><Link href="/dashboard"><Logo /></Link>
-        <button className="lg:hidden" onClick={() => setMobile(false)} aria-label="Close menu"><X className="h-5 w-5" /></button></div>
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        {groups.map((g) => (
-          <div key={g.label} className="mb-4">
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.label}</p>
-            {g.items.map((i) => (
-              <Link key={i.href} href={i.href} className={cn('flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm', isActive(i.href) ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800')}>
-                <i.icon className="h-4 w-4" />{i.label}
-              </Link>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-slate-200 p-3 text-xs dark:border-slate-800">
-        <p className="font-medium">{user.firstName} {user.lastName}</p>
-        <p className="truncate text-slate-500">{user.roles.join(', ')}</p>
-      </div>
-    </nav>
-  );
+function UserMenu() {
+  const { user, logout } = useAuth(); const { dark, toggle } = useTheme(); const router = useRouter();
+  const [open, setOpen] = useState(false); const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const f = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', f); return () => document.removeEventListener('mousedown', f); }, []);
+  if (!user) return null;
+  const name = `${user.firstName} ${user.lastName}`.trim();
+  const role = (user.roles[0] ?? '').replace(/_/g, ' ').toLowerCase();
   return (
-    <div className="flex min-h-screen">
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-slate-200 bg-white lg:block dark:border-slate-800 dark:bg-slate-900">{sidebar}</aside>
-      {mobile && <div className="fixed inset-0 z-40 lg:hidden"><div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobile(false)} /><aside className="absolute inset-y-0 left-0 w-64 bg-white dark:bg-slate-900">{sidebar}</aside></div>}
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
-        <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/90 px-3 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
-          <button className="lg:hidden" onClick={() => setMobile(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
-          <button onClick={() => setPalette(true)} className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-left text-sm text-slate-400 sm:max-w-md dark:border-slate-700">
-            <Search className="h-4 w-4" /><span className="flex-1 truncate">Search patients…</span><kbd className="hidden rounded border px-1.5 text-[10px] sm:inline dark:border-slate-700">Ctrl K</kbd>
-          </button>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden md:block"><FacilitySwitcher /></span>
-            <button className="btn-secondary px-2" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
-            <button className="btn-secondary px-2" onClick={logout} aria-label="Log out"><LogOut className="h-4 w-4" /></button>
+    <div className="relative" ref={ref}>
+      <button className="profile-btn" onClick={() => setOpen(!open)} aria-haspopup="menu" aria-expanded={open}>
+        <Avatar name={name} size={36} />
+        <span className="profile-txt hide-sm"><b>{name}</b><small>{role}{user.roles.length > 1 ? ` +${user.roles.length - 1}` : ''}</small></span>
+        <ChevronDown className="hide-sm h-3.5 w-3.5 text-slate-400" />
+      </button>
+      {open && (
+        <div className="menu-pop" role="menu">
+          <div className="flex items-center gap-3 px-2.5 py-2"><Avatar name={name} size={38} /><div className="min-w-0"><b className="block truncate">{name}</b><span className="block truncate text-xs text-slate-500">{user.email}</span></div></div>
+          {user.tenant?.name && <div className="px-2.5 pb-2 text-xs text-slate-500">{user.tenant.name}</div>}
+          <div className="divider" style={{ margin: '4px 0' }} />
+          <button onClick={() => { setOpen(false); router.push('/account'); }}><UserCircle2 />My account</button>
+          {user.roles.includes('ADMIN') && <button onClick={() => { setOpen(false); router.push('/admin'); }}><Settings />Facility settings</button>}
+          <button onClick={toggle}>{dark ? <Sun /> : <Moon />}{dark ? 'Light mode' : 'Dark mode'}</button>
+          <button onClick={logout} style={{ color: 'var(--bad)' }}><LogOut style={{ color: 'var(--bad)' }} />Sign out</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Notifications() {
+  const { data } = useGet<any>('/reports/dashboard');
+  const [open, setOpen] = useState(false); const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const f = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', f); return () => document.removeEventListener('mousedown', f); }, []);
+  const items = [
+    data?.lowStockCount ? { href: '/inventory', title: `${data.lowStockCount} item${data.lowStockCount === 1 ? '' : 's'} below reorder level`, body: 'Raise a requisition before they run out.' } : null,
+    data?.claimsPending?.count ? { href: '/claims', title: `${data.claimsPending.count} claim${data.claimsPending.count === 1 ? '' : 's'} pending`, body: 'Submit or follow up with the payer.' } : null,
+  ].filter(Boolean) as { href: string; title: string; body: string }[];
+  return (
+    <div className="relative" ref={ref}>
+      <button className="iconbtn" aria-label="Notifications" onClick={() => setOpen(!open)}><Bell className="h-4 w-4" />{items.length > 0 && <span className="dot-count">{items.length}</span>}</button>
+      {open && (
+        <div className="menu-pop" style={{ width: 340 }}>
+          <div className="px-2.5 py-2 font-bold">Alerts</div>
+          {items.length === 0 && <p className="m-0 px-2.5 pb-3 text-sm text-slate-500">You are all caught up.</p>}
+          {items.map((n) => <Link key={n.href} href={n.href} onClick={() => setOpen(false)} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}><b className="text-[13px]">{n.title}</b><span className="text-xs text-slate-500">{n.body}</span></Link>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { user, loading, hasRole } = useAuth();
+  const router = useRouter(); const path = usePathname();
+  const [mobile, setMobile] = useState(false); const [palette, setPalette] = useState(false); const [filter, setFilter] = useState('');
+  const [closed, setClosed] = useState<Record<string, boolean>>({}); const [refresh, setRefresh] = useState(0);
+  const contentRef = useRef<HTMLElement>(null);
+  useEffect(() => setClosed(readClosed()), []);
+  useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(path)}`); }, [loading, user, router, path]);
+  useEffect(() => { setMobile(false); contentRef.current?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); }, [path]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); } };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, []);
+  const groups = useMemo(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || hasRole(...i.roles)) })).filter((g) => g.items.length), [hasRole]);
+  const all = useMemo(() => groups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label }))), [groups]);
+  if (loading || !user) return <div className="grid min-h-screen place-items-center"><div className="w-72"><Loading rows={3} /></div></div>;
+
+  const current = [...all].sort((a, b) => b.href.length - a.href.length).find((i) => isActive(path, i.href));
+  const f = filter.trim().toLowerCase();
+  const shown = f ? groups.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(f) || g.label.toLowerCase().includes(f)) })).filter((g) => g.items.length) : groups;
+  const toggleGroup = (t: string) => setClosed((c) => { const n = { ...c, [t]: !c[t] }; try { localStorage.setItem('hmis.nav.closed', JSON.stringify(n)); } catch { /* private mode */ } return n; });
+  const bottom: NavItem[] = BOTTOM.map((h) => all.find((i) => i.href === h)).filter(Boolean).slice(0, 4) as NavItem[];
+  const moreActive = !bottom.some((i) => isActive(path, i.href));
+
+  return (
+    <div className="app">
+      <div className="glass-bubbles" aria-hidden>{BUBBLES.map(([l, t, s, d]) => <span key={`${l}-${t}`} style={{ left: `${l}%`, top: `${t}%`, width: s, height: s, animationDelay: `-${d}s` }} />)}</div>
+      {mobile && <div className="scrim" onClick={() => setMobile(false)} />}
+      <aside className={cn('side no-print', mobile && 'open')}>
+        <div className="side-head"><Link href="/dashboard" className="min-w-0 flex-1 text-inherit no-underline" style={{ color: 'inherit' }}><Logo sub={user.tenant?.name ?? 'Hospital management'} /></Link>
+          <button className="side-close" onClick={() => setMobile(false)} aria-label="Close menu"><X className="h-5 w-5" /></button></div>
+        <div className="side-search"><Search className="h-3.5 w-3.5" /><input placeholder="Find a page" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find a page" /><kbd>Ctrl K</kbd></div>
+        <div className="side-scroll">
+          {shown.map((g) => {
+            const isClosed = !f && closed[g.label] && !g.items.some((i) => isActive(path, i.href));
+            return (
+              <div key={g.label} className="navsec">
+                <button type="button" className={cn('navgroup', isClosed && 'closed')} onClick={() => toggleGroup(g.label)}><span>{g.label}</span><ChevronDown className="h-3 w-3" /></button>
+                {!isClosed && g.items.map((i) => (
+                  <Link key={i.href} href={i.href} prefetch={false} className={cn('navlink', isActive(path, i.href) && 'on')}>
+                    <span className="ni"><i.icon className="h-5 w-5" /></span><span className="nl">{i.label}</span>{i.pill && <span className="pill">{i.pill}</span>}
+                  </Link>
+                ))}
+              </div>
+            );
+          })}
+          {shown.length === 0 && <p className="px-3 text-sm text-slate-500">No page matches &quot;{filter}&quot;.</p>}
+        </div>
+        <div className="side-foot"><PoweredBy /></div>
+      </aside>
+      <div className="main">
+        <header className="topbar no-print">
+          <button className="iconbtn burger" onClick={() => setMobile(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
+          <div className="crumbs">
+            <span className="crumb-title">{current?.label ?? 'JMSURF HMIS'}</span>
+            <span className="crumb-path">{current && <><span>{current.group}</span><ChevronRight className="h-3.5 w-3.5" /></>}<b>{current?.label ?? 'JMSURF HMIS'}</b></span>
           </div>
+          <button className="cmdk-btn" onClick={() => setPalette(true)}><Search className="h-4 w-4" /><span>Search patients, pages and actions</span><kbd>Ctrl K</kbd></button>
+          <button className="iconbtn search-sm" onClick={() => setPalette(true)} aria-label="Search"><Search className="h-4 w-4" /></button>
+          <FacilitySwitcher />
+          <button className="iconbtn hide-sm" title="Refresh" aria-label="Refresh this page" onClick={() => setRefresh((r) => r + 1)}><RefreshCw className="h-4 w-4" /></button>
+          <Notifications />
+          <UserMenu />
         </header>
-        <main className="flex-1 p-3 sm:p-6">{children}</main>
+        <main className="content" ref={contentRef}><div className="page" key={`${path}-${refresh}`}>{children}</div></main>
       </div>
-      <CommandPalette open={palette} setOpen={setPalette} />
+      <nav className="notch-nav lg-hide no-print" aria-label="Main">
+        {bottom.map((i) => <Link key={i.href} href={i.href} className={cn('notch-item', isActive(path, i.href) && 'is-active')}><span className="notch-ico"><i.icon /></span><span>{i.short ?? i.label}</span></Link>)}
+        <button type="button" className={cn('notch-item', moreActive && 'is-active')} onClick={() => setMobile(true)}><span className="notch-ico"><LayoutGrid /></span><span>More</span></button>
+      </nav>
+      <CommandPalette open={palette} setOpen={setPalette} pages={all} />
     </div>
   );
 }

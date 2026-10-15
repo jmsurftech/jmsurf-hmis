@@ -4,19 +4,19 @@ import {
   ShieldAlert, ShoppingCart, Stethoscope, Users, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
 } from 'lucide-react';
 
-export interface NavItem { href: string; label: string; icon: React.ElementType; roles?: string[] }
+export interface NavItem { href: string; label: string; icon: React.ElementType; roles?: string[]; short?: string; pill?: string }
 export interface NavGroup { label: string; items: NavItem[] }
 
 const CLIN = ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'TRIAGE_NURSE'];
 export const NAV: NavGroup[] = [
-  { label: 'Overview', items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+  { label: 'Overview', items: [{ href: '/dashboard', label: 'Dashboard', short: 'Home', icon: LayoutDashboard }] },
   { label: 'Front office', items: [
     { href: '/patients', label: 'Patients', icon: Users, roles: ['RECEPTION', ...CLIN, 'CASHIER', 'CLAIMS_OFFICER'] },
     { href: '/queue', label: 'Queue', icon: ListOrdered, roles: ['RECEPTION', ...CLIN, 'LAB_TECH', 'PHARMACIST', 'CASHIER'] },
     { href: '/appointments', label: 'Appointments', icon: CalendarDays, roles: ['RECEPTION', ...CLIN] },
   ] },
   { label: 'Clinical', items: [
-    { href: '/opd', label: 'OPD', icon: Stethoscope, roles: CLIN },
+    { href: '/opd', label: 'Outpatient (OPD)', short: 'OPD', icon: Stethoscope, roles: CLIN },
     { href: '/lab', label: 'Laboratory', icon: FlaskConical, roles: ['LAB_TECH', 'DOCTOR', 'CLINICAL_OFFICER'] },
     { href: '/radiology', label: 'Radiology', icon: ScanLine, roles: ['RADIOGRAPHER', 'DOCTOR', 'CLINICAL_OFFICER'] },
     { href: '/pharmacy', label: 'Pharmacy', icon: Pill, roles: ['PHARMACIST'] },
@@ -58,3 +58,6 @@ export const NAV: NavGroup[] = [
 ];
 export const ROLES = ['ADMIN','RECEPTION','TRIAGE_NURSE','NURSE','DOCTOR','CLINICAL_OFFICER','LAB_TECH','RADIOGRAPHER','PHARMACIST','CASHIER','CLAIMS_OFFICER','STOREKEEPER','PROCUREMENT','ACCOUNTANT','HR','MANAGER'];
 export { HeartPulse, ClipboardList, FileText, CreditCard };
+
+/** Phone bottom bar: the first four of these the user can open, then "More". */
+export const BOTTOM = ['/dashboard', '/patients', '/queue', '/opd', '/billing', '/pharmacy', '/lab', '/reports'];

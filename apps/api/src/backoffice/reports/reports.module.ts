@@ -68,22 +68,48 @@ export class ReportsService {
         WHERE i."tenantId" = ${t} AND i.active = true AND i."reorderLevel" > 0
         AND COALESCE((SELECT SUM(b.quantity) FROM "StockBatch" b WHERE b."itemId" = i.id AND b."tenantId" = ${t}), 0) <= i."reorderLevel"`,
     ]);
+    const since14 = new Date(today.getTime() - 13 * 86400000);
+    const [visitDays, payDays, payerMix, queue, apptsToday, inpatients, labPending, rxPending] = await Promise.all([
+      this.prisma.$queryRaw<{ d: string; n: bigint }[]>`
+        SELECT to_char(("startedAt" + interval '3 hours')::date, 'YYYY-MM-DD') AS d, COUNT(*) AS n FROM "Visit"
+        WHERE "tenantId" = ${t} AND "startedAt" >= ${since14} AND status <> 'CANCELLED' GROUP BY 1`,
+      this.prisma.$queryRaw<{ d: string; s: bigint }[]>`
+        SELECT to_char(("createdAt" + interval '3 hours')::date, 'YYYY-MM-DD') AS d, COALESCE(SUM("amountMinor"), 0) AS s FROM "Payment"
+        WHERE "tenantId" = ${t} AND "createdAt" >= ${since14} AND status = 'COMPLETED' GROUP BY 1`,
+      this.prisma.visit.groupBy({ by: ['payerType'], where: { tenantId: t, ...fac, startedAt: { gte: month }, status: { not: 'CANCELLED' } }, _count: true }),
+      this.prisma.queueTicket.groupBy({ by: ['servicePoint', 'status'], where: { tenantId: t, createdAt: { gte: today }, status: { in: ['WAITING', 'CALLED', 'SERVING'] } }, _count: true }).catch(() => []),
+      this.prisma.appointment.count({ where: { tenantId: t, startAt: { gte: today, lt: new Date(today.getTime() + 86400000) }, status: { notIn: ['CANCELLED'] } } }).catch(() => 0),
+      this.prisma.admission.count({ where: { tenantId: t, dischargedAt: null } }).catch(() => 0),
+      this.prisma.order.count({ where: { tenantId: t, type: 'LAB', status: { in: ['REQUESTED', 'PAID', 'IN_PROGRESS', 'COMPLETED'] } } }).catch(() => 0),
+      this.prisma.prescription.count({ where: { tenantId: t, status: { in: ['PENDING', 'PARTIAL'] } } }).catch(() => 0),
+    ]);
+    const days = Array.from({ length: 14 }, (_, i) => new Date(since14.getTime() + i * 86400000 + EAT_OFFSET_MS).toISOString().slice(0, 10));
+    const vMap = new Map(visitDays.map((r) => [r.d, Number(r.n)])); const pMap = new Map(payDays.map((r) => [r.d, Number(r.s)]));
     const coll = (rows: typeof collToday) => {
       const byMethod = rows.map((r) => ({ method: r.method, amountMinor: r._sum.amountMinor ?? 0, count: r._count }));
       return { totalMinor: byMethod.reduce((s, r) => s + r.amountMinor, 0), byMethod };
     };
+    const queueBy: Record<string, { waiting: number; called: number; serving: number }> = {};
+    for (const q of queue as any[]) { const s = (queueBy[q.servicePoint] ??= { waiting: 0, called: 0, serving: 0 }); s[String(q.status).toLowerCase() as 'waiting'] += q._count; }
+    // Money is shown only to roles that handle it.
+    const money = u.isSuperAdmin || u.roles.some((r) => ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'CASHIER', 'CLAIMS_OFFICER'].includes(r));
     return {
       asOf: new Date().toISOString(),
+      showMoney: money,
       visitsToday,
-      revenueTodayMinor: revToday._sum.totalMinor ?? 0,
-      revenueMonthMinor: revMonth._sum.totalMinor ?? 0,
-      collectionsToday: coll(collToday),
-      collectionsMonth: coll(collMonth),
-      claimsPending: { count: claimsPending._count, valueMinor: claimsPending._sum.totalMinor ?? 0 },
+      revenueTodayMinor: money ? revToday._sum.totalMinor ?? 0 : null,
+      revenueMonthMinor: money ? revMonth._sum.totalMinor ?? 0 : null,
+      collectionsToday: money ? coll(collToday) : null,
+      collectionsMonth: money ? coll(collMonth) : null,
+      claimsPending: money ? { count: claimsPending._count, valueMinor: claimsPending._sum.totalMinor ?? 0 } : null,
       beds: { total: beds, occupied, occupancyPct: beds ? Math.round((occupied / beds) * 1000) / 10 : 0 },
       topDiagnoses: topDx.map((d) => ({ code: d.code, display: d.display, count: d._count._all })),
       labTurnaround: { avgMinutes: tat[0]?.avg != null ? Math.round(tat[0].avg) : null, orders: Number(tat[0]?.n ?? 0) },
       lowStockCount: Number(lowStock[0]?.n ?? 0),
+      trend: days.map((d) => ({ day: d, visits: vMap.get(d) ?? 0, collectedMinor: money ? pMap.get(d) ?? 0 : 0 })),
+      payerMix: payerMix.map((p) => ({ payerType: p.payerType, visits: p._count })),
+      queue: Object.entries(queueBy).map(([servicePoint, v]) => ({ servicePoint, ...v })),
+      appointmentsToday: apptsToday, inpatients, labPending, prescriptionsPending: rxPending,
     };
   }
 
@@ -256,8 +282,8 @@ export class ReportsService {
         const d = await this.dashboard(u, q.facilityId);
         return [
           { metric: 'visitsToday', value: d.visitsToday }, { metric: 'revenueTodayMinor', value: d.revenueTodayMinor },
-          { metric: 'revenueMonthMinor', value: d.revenueMonthMinor }, { metric: 'collectionsTodayMinor', value: d.collectionsToday.totalMinor },
-          { metric: 'claimsPendingValueMinor', value: d.claimsPending.valueMinor }, { metric: 'bedOccupancyPct', value: d.beds.occupancyPct },
+          { metric: 'revenueMonthMinor', value: d.revenueMonthMinor }, { metric: 'collectionsTodayMinor', value: d.collectionsToday?.totalMinor ?? null },
+          { metric: 'claimsPendingValueMinor', value: d.claimsPending?.valueMinor ?? null }, { metric: 'bedOccupancyPct', value: d.beds.occupancyPct },
           { metric: 'labTurnaroundAvgMinutes', value: d.labTurnaround.avgMinutes }, { metric: 'lowStockCount', value: d.lowStockCount },
         ];
       }
@@ -274,7 +300,7 @@ export class ReportsController {
   constructor(private svc: ReportsService) {}
 
   @Get() list() { return ReportsService.REPORTS; }
-  @Get('dashboard') @Roles('MANAGER', 'ACCOUNTANT', 'DOCTOR', 'CASHIER', 'CLAIMS_OFFICER')
+  @Get('dashboard') @Roles('MANAGER', 'ACCOUNTANT', 'DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'TRIAGE_NURSE', 'CASHIER', 'CLAIMS_OFFICER', 'RECEPTION', 'LAB_TECH', 'RADIOGRAPHER', 'PHARMACIST', 'STOREKEEPER', 'PROCUREMENT', 'HR')
   dashboard(@CurrentUser() u: AuthUser, @Query('facilityId') facilityId?: string) { return this.svc.dashboard(u, facilityId); }
   @Get('moh705a') moh705a(@CurrentUser() u: AuthUser, @Query('period') period?: string, @Query('facilityId') f?: string) { return this.svc.moh705(u, '705A', period ?? currentPeriod(), f); }
   @Get('moh705b') moh705b(@CurrentUser() u: AuthUser, @Query('period') period?: string, @Query('facilityId') f?: string) { return this.svc.moh705(u, '705B', period ?? currentPeriod(), f); }

@@ -1,9 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Injectable, Module, Post, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Injectable, Module, Patch, Post, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule, PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import * as bcrypt from 'bcryptjs';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { MailService } from '../common/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CurrentUser, Public } from '../common/auth-user';
@@ -21,6 +23,22 @@ class SignupDto {
   @IsString() lastName: string;
   @IsEmail() email: string;
   @IsOptional() @IsString() phone?: string;
+  @IsString() @MinLength(8) password: string;
+  @IsOptional() @IsIn(['CLINIC', 'HOSPITAL', 'ENTERPRISE', 'PER_VISIT']) plan?: string;
+}
+
+class ProfileDto {
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+  @IsOptional() @IsString() phone?: string;
+}
+class ChangePasswordDto {
+  @IsString() currentPassword: string;
+  @IsString() @MinLength(8) newPassword: string;
+}
+class ForgotDto { @IsEmail() email: string; }
+class ResetDto {
+  @IsString() token: string;
   @IsString() @MinLength(8) password: string;
 }
 
@@ -44,7 +62,7 @@ const DEFAULT_MODULES = [
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwt: JwtService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private jwt: JwtService, private audit: AuditService, private mail: MailService) {}
 
   private sign(u: { id: string; tenantId: string | null; email: string; roles: string[]; facilityIds: string[]; isSuperAdmin: boolean }) {
     const payload: AuthUser = {
@@ -76,6 +94,8 @@ export class AuthService {
         data: {
           name: dto.organisationName, slug, countryCode: dto.countryCode ?? 'KE',
           trialEndsAt: new Date(Date.now() + 30 * 86400000), enabledModules: DEFAULT_MODULES,
+          plan: dto.plan === 'CLINIC' || dto.plan === 'ENTERPRISE' ? dto.plan : 'HOSPITAL',
+          settings: dto.plan === 'PER_VISIT' ? { billingModel: 'PER_VISIT' } : {},
         },
       });
       const facility = await tx.facility.create({
@@ -99,7 +119,58 @@ export class AuthService {
         },
       });
     });
+    await this.audit.log({ tenantId: user.tenantId ?? undefined, userId: user.id, action: 'SIGNUP', entity: 'Tenant', entityId: user.tenantId ?? undefined });
+    void this.mail.send(user.email, 'Welcome to JMSURF HMIS', this.mail.layout(`Welcome, ${user.firstName}`,
+      `<p>Your facility <b>${dto.organisationName}</b> is ready. Sign in to add departments, price lists, payers and your team.</p>`,
+      { label: 'Open JMSURF HMIS', url: `${this.webUrl()}/dashboard` }));
     return { accessToken: this.sign(user), user: this.publicUser(user) };
+  }
+
+  private webUrl() { return (process.env.WEB_URL || process.env.WEB_ORIGIN?.split(',')[0] || 'http://localhost:3000').replace(/\/$/, ''); }
+
+  async updateProfile(u: AuthUser, dto: ProfileDto) {
+    const user = await this.prisma.user.update({
+      where: { id: u.sub },
+      data: { firstName: dto.firstName?.trim() || undefined, lastName: dto.lastName?.trim() || undefined, phone: dto.phone?.trim() || undefined },
+    });
+    await this.audit.log({ tenantId: u.tenantId || undefined, userId: u.sub, action: 'UPDATE_PROFILE', entity: 'User', entityId: u.sub });
+    return this.publicUser(user);
+  }
+
+  async changePassword(u: AuthUser, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: u.sub } });
+    if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) throw new BadRequestException('Your current password is not correct');
+    await this.prisma.user.update({ where: { id: u.sub }, data: { passwordHash: await bcrypt.hash(dto.newPassword, 10) } });
+    await this.audit.log({ tenantId: u.tenantId || undefined, userId: u.sub, action: 'CHANGE_PASSWORD', entity: 'User', entityId: u.sub });
+    return { ok: true };
+  }
+
+  /** Reset tokens are short-lived JWTs bound to the current password hash, so each link works once. */
+  private resetKey(hash: string) { return createHash('sha256').update(hash).digest('hex').slice(0, 16); }
+
+  async forgot(dto: ForgotDto) {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
+    if (user?.active) {
+      const token = this.jwt.sign({ sub: user.id, purpose: 'reset', k: this.resetKey(user.passwordHash) }, { expiresIn: '1h' });
+      const url = `${this.webUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+      await this.mail.send(user.email, 'Reset your JMSURF HMIS password', this.mail.layout('Reset your password',
+        '<p>Someone asked to reset the password for this account. The link works once and expires in one hour. If it was not you, you can ignore this email.</p>',
+        { label: 'Choose a new password', url }));
+      await this.audit.log({ tenantId: user.tenantId ?? undefined, userId: user.id, action: 'PASSWORD_RESET_REQUESTED', entity: 'User', entityId: user.id });
+    }
+    // Same answer whether or not the address exists.
+    return { ok: true };
+  }
+
+  async reset(dto: ResetDto) {
+    let p: any;
+    try { p = this.jwt.verify(dto.token); } catch { throw new BadRequestException('This reset link has expired. Ask for a new one.'); }
+    if (p?.purpose !== 'reset') throw new BadRequestException('This reset link is not valid.');
+    const user = await this.prisma.user.findUnique({ where: { id: p.sub } });
+    if (!user || !user.active || this.resetKey(user.passwordHash) !== p.k) throw new BadRequestException('This reset link has already been used. Ask for a new one.');
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(dto.password, 10) } });
+    await this.audit.log({ tenantId: user.tenantId ?? undefined, userId: user.id, action: 'PASSWORD_RESET', entity: 'User', entityId: user.id });
+    return { ok: true };
   }
 
   async me(u: AuthUser) {
@@ -130,6 +201,26 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() u: AuthUser) {
     return this.auth.me(u);
+  }
+
+  @Patch('me')
+  updateMe(@CurrentUser() u: AuthUser, @Body() dto: ProfileDto) {
+    return this.auth.updateProfile(u, dto);
+  }
+
+  @Post('change-password')
+  changePassword(@CurrentUser() u: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(u, dto);
+  }
+
+  @Public() @Post('forgot-password')
+  forgot(@Body() dto: ForgotDto) {
+    return this.auth.forgot(dto);
+  }
+
+  @Public() @Post('reset-password')
+  reset(@Body() dto: ResetDto) {
+    return this.auth.reset(dto);
   }
 }
 

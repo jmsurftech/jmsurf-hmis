@@ -1,86 +1,99 @@
 'use client';
 import { zodResolver } from '@/lib/zodResolver';
-import { Check } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Building2, Check, Hospital, Stethoscope, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Logo } from '@/components/AppShell';
+import { AuthLayout } from '@/components/AuthLayout';
+import { PasswordInput } from '@/components/PasswordInput';
 import { Field, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth, type AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 
 const schema = z.object({
-  organisationName: z.string().min(2, 'Required'),
+  organisationName: z.string().trim().min(2, 'Enter the organisation name'),
   kmhflCode: z.string().optional(),
   countryCode: z.string().min(2),
-  plan: z.string().optional(),
-  firstName: z.string().min(1, 'Required'),
-  lastName: z.string().min(1, 'Required'),
-  email: z.string().email(),
+  plan: z.string(),
+  firstName: z.string().trim().min(1, 'Enter your first name'),
+  lastName: z.string().trim().min(1, 'Enter your last name'),
+  email: z.string().email('Enter a valid email address'),
   phone: z.string().optional(),
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string().min(8, 'Use at least 8 characters'),
   confirm: z.string(),
-}).refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
+  terms: z.literal(true, { errorMap: () => ({ message: 'Accept the terms to continue' }) }),
+}).refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'The passwords do not match' });
 type F = z.infer<typeof schema>;
-const steps = ['Organisation', 'Facility', 'Admin user', 'Review'];
-const stepFields: (keyof F)[][] = [['organisationName', 'countryCode'], ['kmhflCode', 'plan'], ['firstName', 'lastName', 'email', 'phone', 'password', 'confirm'], []];
+const STEPS = ['Organisation', 'Plan', 'Your account', 'Review'];
+const STEP_FIELDS: (keyof F)[][] = [['organisationName', 'countryCode', 'kmhflCode'], ['plan'], ['firstName', 'lastName', 'email', 'phone', 'password', 'confirm'], ['terms']];
 const COUNTRIES = [['KE', 'Kenya'], ['UG', 'Uganda'], ['TZ', 'Tanzania'], ['RW', 'Rwanda'], ['ET', 'Ethiopia'], ['GH', 'Ghana'], ['NG', 'Nigeria'], ['ZM', 'Zambia'], ['ZA', 'South Africa']];
+const PLANS = [
+  { id: 'CLINIC', icon: Stethoscope, name: 'Clinic', price: 'KES 4,999 / month', d: 'Outpatient clinics and medical centres' },
+  { id: 'HOSPITAL', icon: Hospital, name: 'Hospital', price: 'KES 14,999 / month', d: 'Inpatient care, theatre, maternity, dialysis' },
+  { id: 'PER_VISIT', icon: Users, name: 'Per visit', price: 'KES 49 / visit', d: 'Low-volume or seasonal clinics' },
+  { id: 'ENTERPRISE', icon: Building2, name: 'Enterprise', price: 'Custom', d: 'Groups and networks with many facilities' },
+];
 
 export default function Signup() {
   const [step, setStep] = useState(0); const [err, setErr] = useState('');
   const { setSession } = useAuth(); const router = useRouter();
-  const { register, handleSubmit, trigger, getValues, formState: { errors, isSubmitting } } = useForm<F>({ resolver: zodResolver(schema), defaultValues: { countryCode: 'KE', plan: 'HOSPITAL' } });
-  const next = async () => { if (await trigger(stepFields[step])) setStep(step + 1); };
-  const submit = handleSubmit(async ({ confirm: _c, plan: _p, ...v }) => {
+  const { register, handleSubmit, trigger, getValues, setValue, watch, formState: { errors, isSubmitting } } = useForm<F>({ resolver: zodResolver(schema), defaultValues: { countryCode: 'KE', plan: 'HOSPITAL' } as any });
+  const next = async () => { if (await trigger(STEP_FIELDS[step])) setStep(step + 1); };
+  const submit = handleSubmit(async ({ confirm: _c, terms: _t, ...v }) => {
     setErr('');
     try {
-      const r = await api.post<{ accessToken: string; user: AuthUser }>('/auth/signup', v);
-      setSession(r.accessToken, r.user); router.replace('/dashboard');
+      const r = await api.post<{ accessToken: string; user: AuthUser }>('/auth/signup', { ...v, kmhflCode: v.kmhflCode || undefined, phone: v.phone || undefined });
+      setSession(r.accessToken, r.user); router.replace('/dashboard?welcome=1');
     } catch (e) { setErr((e as Error).message); }
-  });
-  const v = getValues();
+  }, () => setErr('Some details need attention. Go back and check each step.'));
+  const v = getValues(); const plan = watch('plan');
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50 p-4 dark:from-slate-950 dark:to-slate-900">
-      <div className="card w-full max-w-lg p-6">
-        <div className="mb-4 flex justify-center"><Logo className="text-lg" /></div>
-        <ol className="mb-6 flex items-center justify-between">
-          {steps.map((s, i) => (
-            <li key={s} className="flex flex-1 flex-col items-center text-xs">
-              <span className={cn('mb-1 flex h-7 w-7 items-center justify-center rounded-full border text-xs', i < step ? 'border-primary-600 bg-primary-600 text-white' : i === step ? 'border-primary-600 text-primary-700' : 'border-slate-300 text-slate-400')}>{i < step ? <Check className="h-4 w-4" /> : i + 1}</span>{s}
-            </li>
-          ))}
-        </ol>
-        {err && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{err}</p>}
-        <form onSubmit={(e) => { e.preventDefault(); step === 3 ? submit() : next(); }} className="space-y-4">
+    <AuthLayout>
+      <div className="authcard lg">
+        <div className="mb-6 flex items-center gap-3"><img src="/hmis-logo.svg" alt="" className="h-12 w-12" /><div><h1>Create your facility</h1><p className="m-0 text-sm text-slate-500">30-day free trial. No setup fee.</p></div></div>
+        <div className="steps">{STEPS.map((s, i) => <div key={s} className={cn(i === step && 'cur')}><i className={cn(i <= step && 'on')} /><span>{s}</span></div>)}</div>
+        {err && <div className="alert bad mb-4"><AlertTriangle />{err}</div>}
+        <form onSubmit={(e) => { e.preventDefault(); step === 3 ? submit() : next(); }} className="flex flex-col gap-4" noValidate>
           {step === 0 && <>
-            <Field label="Organisation name" error={errors.organisationName?.message}><input className="input" placeholder="e.g. Mercy Medical Centre" {...register('organisationName')} /></Field>
-            <Field label="Country"><select className="input" {...register('countryCode')}>{COUNTRIES.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Field>
+            <Field label="Organisation name" error={errors.organisationName?.message} hint="The hospital, clinic or group as patients know it."><input className="input" placeholder="Enter your organisation name" autoFocus {...register('organisationName')} /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Country"><select className="input" {...register('countryCode')}>{COUNTRIES.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Field>
+              <Field label="KMHFL / KMHFR code" hint="Kenya facilities. Optional now."><input className="input" inputMode="numeric" placeholder="Enter the facility code" {...register('kmhflCode')} /></Field>
+            </div>
           </>}
-          {step === 1 && <>
-            <Field label="KMHFL / KMHFR facility code (Kenya)"><input className="input" placeholder="e.g. 13023" {...register('kmhflCode')} /></Field>
-            <Field label="Plan"><select className="input" {...register('plan')}><option value="CLINIC">Clinic: KES 4,999/mo</option><option value="HOSPITAL">Hospital: KES 14,999/mo</option><option value="PER_VISIT">Per visit: KES 49/visit</option><option value="ENTERPRISE">Enterprise: custom</option></select></Field>
-            <p className="text-xs text-slate-500">No setup fee. You can change plans later.</p>
-          </>}
-          {step === 2 && <div className="grid grid-cols-2 gap-3">
-            <Field label="First name" error={errors.firstName?.message}><input className="input" {...register('firstName')} /></Field>
-            <Field label="Last name" error={errors.lastName?.message}><input className="input" {...register('lastName')} /></Field>
-            <Field label="Email" error={errors.email?.message} className="col-span-2"><input className="input" type="email" {...register('email')} /></Field>
-            <Field label="Phone" className="col-span-2"><input className="input" placeholder="+2547…" {...register('phone')} /></Field>
-            <Field label="Password" error={errors.password?.message}><input className="input" type="password" {...register('password')} /></Field>
-            <Field label="Confirm" error={errors.confirm?.message}><input className="input" type="password" {...register('confirm')} /></Field>
+          {step === 1 && <div className="grid gap-3 sm:grid-cols-2">
+            {PLANS.map((p) => (
+              <button type="button" key={p.id} onClick={() => setValue('plan', p.id)} className={cn('tile flex-col items-start', plan === p.id && '!border-[var(--brand)] ring-4 ring-[rgb(189_35_50/.12)]')}>
+                <span className="flex w-full items-center justify-between"><span className="ti"><p.icon /></span>{plan === p.id && <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--brand)] text-white"><Check className="h-4 w-4" /></span>}</span>
+                <b className="mt-2 text-[15px]">{p.name}</b><span className="text-sm font-bold text-brand">{p.price}</span><small>{p.d}</small>
+              </button>
+            ))}
+            <p className="m-0 text-xs text-slate-500 sm:col-span-2">You can change plans at any time. Prices exclude VAT.</p>
           </div>}
-          {step === 3 && <dl className="space-y-2 text-sm">
-            {[['Organisation', v.organisationName], ['Country', v.countryCode], ['KMHFL code', v.kmhflCode || '—'], ['Plan', v.plan], ['Admin', `${v.firstName} ${v.lastName} <${v.email}>`]].map(([k, x]) => <div key={k} className="flex justify-between border-b border-slate-100 pb-1 dark:border-slate-800"><dt className="text-slate-500">{k}</dt><dd className="font-medium">{x}</dd></div>)}
-          </dl>}
-          <div className="flex justify-between pt-2">
-            {step > 0 ? <button type="button" className="btn-secondary" onClick={() => setStep(step - 1)}>Back</button> : <Link href="/login" className="btn-secondary">Sign in instead</Link>}
-            <button className="btn-primary" disabled={isSubmitting}>{isSubmitting && <Spinner />}{step === 3 ? 'Create facility' : 'Continue'}</button>
+          {step === 2 && <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="First name" error={errors.firstName?.message}><input className="input" autoComplete="given-name" placeholder="Enter your first name" {...register('firstName')} /></Field>
+            <Field label="Last name" error={errors.lastName?.message}><input className="input" autoComplete="family-name" placeholder="Enter your last name" {...register('lastName')} /></Field>
+            <Field label="Work email" error={errors.email?.message} className="sm:col-span-2" hint="You will sign in with this."><input className="input" type="email" autoComplete="email" placeholder="Enter your email" {...register('email')} /></Field>
+            <Field label="Phone" className="sm:col-span-2" hint="Optional. Include the country code."><input className="input" type="tel" autoComplete="tel" placeholder="Enter your phone number" {...register('phone')} /></Field>
+            <Field label="Password" error={errors.password?.message}><PasswordInput autoComplete="new-password" placeholder="At least 8 characters" {...register('password')} /></Field>
+            <Field label="Confirm password" error={errors.confirm?.message}><PasswordInput autoComplete="new-password" placeholder="Enter it again" {...register('confirm')} /></Field>
+          </div>}
+          {step === 3 && <>
+            <dl className="kv2 rounded-2xl border border-[var(--glass-edge)] bg-white/60 p-4 dark:bg-slate-800/40">
+              {[['Organisation', v.organisationName], ['Country', COUNTRIES.find(([c]) => c === v.countryCode)?.[1]], ['KMHFL code', v.kmhflCode || 'Not given'], ['Plan', PLANS.find((p) => p.id === v.plan)?.name], ['Administrator', `${v.firstName} ${v.lastName}`], ['Email', v.email]].map(([k, x]) => <div key={k}><dt>{k}</dt><dd>{x}</dd></div>)}
+            </dl>
+            <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-0.5" {...register('terms')} /><span>I agree to the terms of service and confirm that this facility will process patient data under the Data Protection Act.</span></label>
+            {errors.terms && <small className="err -mt-2 text-xs font-semibold text-[var(--bad)]">{errors.terms.message}</small>}
+          </>}
+          <div className="mt-2 flex justify-between gap-3">
+            {step > 0 ? <button type="button" className="btn" onClick={() => setStep(step - 1)}><ArrowLeft />Back</button> : <Link href="/login" className="btn ghost">I already have an account</Link>}
+            <button className="btn primary" disabled={isSubmitting}>{isSubmitting && <Spinner />}{step === 3 ? 'Create facility' : 'Continue'}{step < 3 && <ArrowRight />}</button>
           </div>
         </form>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

@@ -10,5 +10,10 @@
     "lint": "pnpm -r lint",
     "db:migrate": "pnpm --filter @jmsurf-hmis/api prisma:migrate",
     "db:seed": "pnpm --filter @jmsurf-hmis/api seed"
+  },
+  "pnpm": {
+    "overrides": {
+      "react-is": "19.0.0"
+    }
   }
 }

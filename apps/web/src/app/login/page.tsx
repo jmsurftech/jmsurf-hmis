@@ -1,39 +1,45 @@
 'use client';
 import { zodResolver } from '@/lib/zodResolver';
+import { AlertTriangle, ArrowRight, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Logo } from '@/components/AppShell';
+import { AuthLayout } from '@/components/AuthLayout';
+import { PasswordInput } from '@/components/PasswordInput';
 import { Field, Spinner } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 
-const schema = z.object({ email: z.string().email(), password: z.string().min(1, 'Required') });
+const schema = z.object({ email: z.string().email('Enter a valid email address'), password: z.string().min(1, 'Enter your password') });
 
 function LoginForm() {
-  const { login } = useAuth(); const router = useRouter(); const [err, setErr] = useState('');
+  const { login, user, loading } = useAuth(); const router = useRouter(); const [err, setErr] = useState('');
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
+  const nextUrl = () => { const n = new URLSearchParams(window.location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard'; };
+  useEffect(() => { if (!loading && user) router.replace(nextUrl()); }, [loading, user, router]);
   const onSubmit = handleSubmit(async (v) => {
     setErr('');
-    try {
-      await login(v.email, v.password);
-      const next = new URLSearchParams(window.location.search).get('next');
-      router.replace(next && next.startsWith('/') ? next : '/dashboard');
-    } catch (e) { setErr((e as Error).message || 'Login failed'); }
+    try { await login(v.email.trim(), v.password); router.replace(nextUrl()); }
+    catch (e) { setErr((e as Error).message === 'Invalid credentials' ? 'That email and password do not match an active account.' : (e as Error).message || 'Sign-in failed'); }
   });
   return (
-    <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-4 p-6">
-      <div className="flex justify-center"><Logo className="text-lg" /></div>
-      <h1 className="text-center text-lg font-semibold">Sign in to your facility</h1>
-      {err && <p className="rounded bg-red-50 p-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{err}</p>}
-      <Field label="Email" error={errors.email?.message}><input className="input" type="email" autoComplete="email" {...register('email')} /></Field>
-      <Field label="Password" error={errors.password?.message}><input className="input" type="password" autoComplete="current-password" {...register('password')} /></Field>
-      <button className="btn-primary w-full" disabled={isSubmitting}>{isSubmitting && <Spinner />}Sign in</button>
-      <p className="text-center text-sm text-slate-500">New facility? <Link href="/signup" className="text-primary-600">Create an account</Link></p>
+    <form onSubmit={onSubmit} className="authcard" noValidate>
+      <img src="/hmis-logo.svg" alt="" className="mb-5 h-14 w-14" />
+      <h1>Sign in to your facility</h1>
+      <p className="lead">Welcome back. Use the email your administrator registered for you.</p>
+      {err && <div className="alert bad mb-4"><AlertTriangle />{err}</div>}
+      <div className="flex flex-col gap-4">
+        <Field label="Email" error={errors.email?.message}><span className="input-icon"><Mail /><input className="input" type="email" autoComplete="email" placeholder="Enter your email" {...register('email')} /></span></Field>
+        <Field label={<span className="flex justify-between"><span>Password</span><Link href="/forgot-password" className="text-[12.5px] font-semibold text-brand">Forgot password?</Link></span>} error={errors.password?.message}>
+          <PasswordInput autoComplete="current-password" placeholder="Enter your password" {...register('password')} />
+        </Field>
+        <button className="btn primary lg mt-1 w-full" disabled={isSubmitting}>{isSubmitting ? <Spinner /> : null}Sign in<ArrowRight /></button>
+      </div>
+      <p className="m-0 mt-6 text-center text-sm text-slate-500">New facility? <Link href="/signup" className="font-bold text-brand">Create an account</Link></p>
     </form>
   );
 }
 export default function LoginPage() {
-  return <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-blue-50 p-4 dark:from-slate-950 dark:to-slate-900"><Suspense><LoginForm /></Suspense></div>;
+  return <AuthLayout><Suspense><LoginForm /></Suspense></AuthLayout>;
 }

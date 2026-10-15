@@ -27,9 +27,9 @@ function schemaFor(fields: FieldDef[]) {
   return z.object(shape);
 }
 
-export function FormDialog({ open, onClose, title, fields, path, method = 'post', defaults, invalidate, success = 'Saved', transform, onDone }: {
+export function FormDialog({ open, onClose, title, fields, path, method = 'post', defaults, invalidate, success = 'Saved', transform, onDone, submitLabel, subtitle }: {
   open: boolean; onClose: () => void; title: string; fields: FieldDef[]; path: string; method?: 'post' | 'patch' | 'put';
-  defaults?: Record<string, any>; invalidate?: string[]; success?: string; transform?: (v: Record<string, any>) => any; onDone?: (r: any) => void;
+  defaults?: Record<string, any>; invalidate?: string[]; success?: string; transform?: (v: Record<string, any>) => any; onDone?: (r: any) => void; submitLabel?: string; subtitle?: React.ReactNode;
 }) {
   const form = useForm<Record<string, any>>({ resolver: zodResolver(schemaFor(fields)), defaultValues: defaults ?? {} });
   useEffect(() => { if (open) form.reset(defaults ?? {}); }, [open]); // eslint-disable-line
@@ -45,9 +45,9 @@ export function FormDialog({ open, onClose, title, fields, path, method = 'post'
     m.mutate(transform ? transform(out) : out);
   });
   return (
-    <Modal open={open} onClose={onClose} title={title} wide={fields.length > 6}
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={submit} disabled={m.isPending}>{m.isPending && <Spinner />}Save</button></>}>
-      <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <Modal open={open} onClose={onClose} title={title} subtitle={subtitle} wide={fields.length > 6}
+      footer={<><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" onClick={submit} disabled={m.isPending}>{m.isPending && <Spinner />}{submitLabel ?? 'Save'}</button></>}>
+      <form onSubmit={submit} className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
         {fields.map((f) => {
           const err = form.formState.errors[f.name]?.message as string | undefined;
           const reg = form.register(f.name);
@@ -56,10 +56,10 @@ export function FormDialog({ open, onClose, title, fields, path, method = 'post'
               {f.type === 'picker' && f.source ? (
                 <EntityPicker source={f.source} value={form.watch(f.name)} placeholder={f.placeholder ?? `Search ${f.label.toLowerCase()}…`} onChange={(id) => form.setValue(f.name, id, { shouldValidate: true })} />
               ) : f.type === 'select' ? (
-                <select className="input" {...reg}><option value="">Select…</option>{f.options?.map((o) => typeof o === 'string' ? <option key={o} value={o}>{o.replace(/_/g, ' ')}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-              ) : f.type === 'textarea' ? <textarea rows={3} className="input" placeholder={f.placeholder} {...reg} />
-                : f.type === 'checkbox' ? <input type="checkbox" className="h-4 w-4" {...reg} />
-                : <input className="input" type={f.type === 'money' ? 'number' : f.type ?? 'text'} step={f.type === 'money' ? '0.01' : undefined} placeholder={f.placeholder} {...reg} />}
+                <select className="input" {...reg}><option value="">Choose {f.label.toLowerCase()}</option>{f.options?.map((o) => typeof o === 'string' ? <option key={o} value={o}>{o.replace(/_/g, ' ')}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+              ) : f.type === 'textarea' ? <textarea rows={3} className="input" placeholder={f.placeholder ?? `Enter ${f.label.toLowerCase()}`} {...reg} />
+                : f.type === 'checkbox' ? <span className="flex h-[46px] items-center"><input type="checkbox" {...reg} /></span>
+                : <input className="input" type={f.type === 'money' ? 'number' : f.type ?? 'text'} step={f.type === 'money' ? '0.01' : undefined} placeholder={f.placeholder ?? (f.type === 'date' || f.type === 'datetime-local' ? undefined : `Enter ${f.label.toLowerCase()}`)} {...reg} />}
             </Field>
           );
         })}

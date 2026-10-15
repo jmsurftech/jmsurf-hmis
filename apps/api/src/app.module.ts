@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule, PrismaService } from './prisma/prisma.service';
 import { SequenceModule } from './common/sequence.service';
 import { AuditModule } from './common/audit.service';
+import { MailModule } from './common/mail.service';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 import { Public } from './common/auth-user';
 import { AuthModule } from './auth/auth.module';
@@ -25,7 +26,7 @@ class HealthController {
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    PrismaModule, SequenceModule, AuditModule, BillingCoreModule, AuthModule,
+    PrismaModule, SequenceModule, AuditModule, MailModule, BillingCoreModule, AuthModule,
     RevenueModule, ClinicalModule, BackOfficeModule,
   ],
   controllers: [HealthController],
