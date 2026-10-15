@@ -8,6 +8,9 @@ Multi-tenant hospital management SaaS for Kenya, built to expand across Africa. 
 - `apps/mock-servers`: sandbox SHA/HIE, M-Pesa, eTIMS, DHIS2, SMS.
 - `docker-compose.yml`: the production stack for Coolify (see `docs/DEPLOY_COOLIFY.md`).
 
+## Schema changes
+Edit `apps/api/prisma/schema/*.prisma`, then run `npx prisma migrate dev --name <change>` and commit the migration. Production applies migrations when the container starts.
+
 ## Rules
 Follow `docs/CONVENTIONS.md`. In particular:
 - `tenantId` always comes from the JWT.

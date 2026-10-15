@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install
-      - run: cd apps/api && npx prisma generate && npx prisma db push --skip-generate
+      - run: cd apps/api && npx prisma generate && npx prisma migrate deploy
       - run: cd apps/api && npx tsc --noEmit -p tsconfig.json && npx jest
       - run: cd apps/api && pnpm build && npx ts-node prisma/seed.ts
       - run: pnpm --filter @jmsurf-hmis/mock-servers build
