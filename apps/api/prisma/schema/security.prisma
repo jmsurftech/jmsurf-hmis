@@ -1,0 +1,34 @@
+// Security: rotating refresh tokens and break-glass emergency access.
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tenantId   String?
+  tokenHash  String    @unique // sha256 of the opaque token
+  familyId   String // rotation family; reuse of a revoked token revokes the whole family
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model BreakGlassGrant {
+  id         String    @id @default(uuid())
+  tenantId   String
+  userId     String
+  patientId  String?
+  reason     String
+  expiresAt  DateTime
+  reviewedAt DateTime?
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, userId, expiresAt])
+  @@index([tenantId, reviewedAt])
+}

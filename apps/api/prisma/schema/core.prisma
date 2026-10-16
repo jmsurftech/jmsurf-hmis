@@ -96,6 +96,10 @@ model User {
   facilityIds      String[]  @default([])
   isSuperAdmin     Boolean   @default(false)
   mfaSecret        String?
+  mfaEnabled       Boolean   @default(false)
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  passwordChangedAt DateTime?
   active           Boolean   @default(true)
   lastLoginAt      DateTime?
   practitioner     Practitioner?

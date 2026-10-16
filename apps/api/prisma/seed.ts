@@ -892,6 +892,18 @@ async function main() {
     });
   }
 
+  // Blood bank stock for the register rules (ABO/Rh crossmatch, TTI release, expiry). Neutral bag numbers.
+  if ((await prisma.moduleRecord.count({ where: { tenantId: T, module: 'blood-units' } })) === 0) {
+    const day = (d: number) => new Date(now + d * DAY).toISOString().slice(0, 10);
+    const units = [['O-', 'Packed red cells'], ['O+', 'Packed red cells'], ['A+', 'Whole blood'], ['B+', 'Fresh frozen plasma']] as const;
+    await prisma.moduleRecord.createMany({
+      data: units.map(([g, c], i) => ({
+        tenantId: T, facilityId: facility.id, module: 'blood-units', number: `BU-DEMO-${String(i + 1).padStart(4, '0')}`, title: `DEMO-BAG-${i + 1}`, status: 'AVAILABLE',
+        data: { bloodGroup: g, component: c, volume: 450, collectedOn: day(-5), expiresOn: day(c === 'Fresh frozen plasma' ? 300 : 30), source: 'KNBTS regional centre', screening: 'Non-reactive' },
+      })),
+    });
+  }
+
   const counts = {
     services: await prisma.serviceItem.count({ where: { tenantId: T } }), labTests: await prisma.labTest.count({ where: { tenantId: T } }),
     stockItems: await prisma.stockItem.count({ where: { tenantId: T } }), patients: await prisma.patient.count({ where: { tenantId: T } }),

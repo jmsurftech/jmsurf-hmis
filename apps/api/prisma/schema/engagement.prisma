@@ -1,0 +1,58 @@
+// Patient engagement extras: reminder templates and log, communication preferences, offline-sync idempotency.
+// The patient portal and telemedicine models live in core.prisma.
+
+/// Per-tenant message templates. code e.g. APPT_REMINDER_24H; lang "en" | "sw". Placeholders {{name}}.
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  code      String
+  lang      String   @default("en")
+  channel   String   @default("SMS") // SMS, WHATSAPP
+  body      String
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code, lang, channel])
+}
+
+/// Every reminder sent (dedupe key prevents repeats).
+model ReminderLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  kind      String // APPT_24H, APPT_2H, IMMUNIZATION_DUE, RESULTS_READY, BILL_BALANCE
+  refId     String
+  patientId String?
+  channel   String   @default("SMS")
+  to        String
+  lang      String   @default("en")
+  body      String
+  status    String   @default("SENT") // SENT, FAILED, SKIPPED
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, kind, refId])
+  @@index([tenantId, createdAt])
+}
+
+/// Patient communication preferences.
+model PatientPreference {
+  id        String   @id @default(uuid())
+  tenantId  String
+  patientId String   @unique
+  language  String   @default("en")
+  whatsapp  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+/// Stored responses for offline-replayed writes (Idempotency-Key header).
+model IdempotencyRecord {
+  id         String   @id @default(uuid())
+  tenantId   String
+  key        String
+  method     String
+  path       String
+  statusCode Int
+  response   Json?
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, key])
+}
