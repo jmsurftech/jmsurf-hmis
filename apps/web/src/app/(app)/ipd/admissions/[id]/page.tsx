@@ -7,10 +7,11 @@ import { Avatar, Card, EmptyState, ErrorNote, KV, Loading, PageHeader, StatCard,
 import { useAction, useGet, useList } from '@/lib/hooks';
 import { date, dateTime, fullName, money } from '@/lib/format';
 import { PICK } from '@/lib/pickers';
+import { AiDischargeButton } from '@/components/AiDraft';
 
 export default function Admission({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [tab, setTab] = useState('notes'); const [dlg, setDlg] = useState<'' | 'note' | 'discharge' | 'transfer' | 'schedule'>('');
+  const [tab, setTab] = useState('notes'); const [aiSummary, setAiSummary] = useState(''); const [dlg, setDlg] = useState<'' | 'note' | 'discharge' | 'transfer' | 'schedule'>('');
   const { data: a, isLoading, error } = useGet<any>(`/inpatient/admissions/${id}`);
   const notes = useList<any>('/emr/notes', { visitId: a?.visitId }, !!a && tab === 'notes');
   const mar = useList<any>(`/inpatient/admissions/${id}/mar`, {}, tab === 'emar');
@@ -23,7 +24,7 @@ export default function Admission({ params }: { params: Promise<{ id: string }> 
   return (
     <div>
       <PageHeader eyebrow={<StatusBadge status={active ? 'ADMITTED' : 'DISCHARGED'} />} title={<span className="flex items-center gap-3"><Avatar name={fullName(p)} size={44} />{fullName(p)}</span>} subtitle={`${p?.mrn ?? ''} · ${a.visit?.visitNumber ?? ''} · admitted ${date(a.admittedAt)}`}
-        actions={active && <><button className="btn" onClick={() => setDlg('transfer')}>Transfer bed</button><button className="btn primary" onClick={() => setDlg('discharge')}><LogOut className="h-4 w-4" />Discharge</button></>} />
+        actions={active && <><button className="btn" onClick={() => setDlg('transfer')}>Transfer bed</button><AiDischargeButton admissionId={id} onDraft={(t) => { setAiSummary(t); setDlg('discharge'); }} /><button className="btn primary" onClick={() => setDlg('discharge')}><LogOut className="h-4 w-4" />Discharge</button></>} />
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Ward and bed" value={a.bed?.label ?? '—'} hint={a.ward?.name} icon={BedDouble} />
         <StatCard label="Length of stay" value={`${los} day${los === 1 ? '' : 's'}`} hint={`Since ${date(a.admittedAt)}`} icon={CalendarClock} tone="blue" />
@@ -48,7 +49,7 @@ export default function Admission({ params }: { params: Promise<{ id: string }> 
         { name: 'prescriptionId', label: 'Prescription', type: 'select', required: true, options: (a.visit?.prescriptions ?? []).map((r: any) => ({ value: r.id, label: `${r.drugName} ${r.dose} ${r.frequency}` })) }, { name: 'days', label: 'Days', type: 'number' }]} />
       <FormDialog open={dlg === 'transfer'} onClose={() => setDlg('')} title="Transfer bed" path={`/inpatient/admissions/${id}/transfer`} invalidate={['/inpatient']} fields={[
         { name: 'wardId', label: 'Ward', type: 'picker', source: PICK.ward, required: true }, { name: 'bedId', label: 'Bed', type: 'picker', source: PICK.bed() }, { name: 'reason', label: 'Reason' }]} />
-      <FormDialog open={dlg === 'discharge'} onClose={() => setDlg('')} title="Discharge patient" path={`/inpatient/admissions/${id}/discharge`} invalidate={['/inpatient']} success="Patient discharged" fields={[
+      <FormDialog open={dlg === 'discharge'} onClose={() => setDlg('')} title="Discharge patient" defaults={aiSummary ? { summary: aiSummary } : undefined} path={`/inpatient/admissions/${id}/discharge`} invalidate={['/inpatient']} success="Patient discharged" fields={[
         { name: 'dischargeType', label: 'Discharge type', type: 'select', options: ['NORMAL', 'AMA', 'REFERRED', 'ABSCONDED', 'DECEASED'], required: true },
         { name: 'summary', label: 'Discharge summary', type: 'textarea', required: true }]} />
     </div>

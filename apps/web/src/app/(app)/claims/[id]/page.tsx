@@ -5,6 +5,7 @@ import { Table } from '@/components/DataTable';
 import { Card, ErrorNote, KV, Loading, PageHeader, Spinner, StatCard, StatusBadge } from '@/components/ui';
 import { useAction, useGet } from '@/lib/hooks';
 import { dateTime, fullName, money } from '@/lib/format';
+import { AiClaimRisk } from '@/components/AiDraft';
 
 const SEV = { ERROR: { icon: AlertCircle, cls: 'bad' }, WARNING: { icon: AlertTriangle, cls: 'warn' }, INFO: { icon: Info, cls: 'info' } } as const;
 
@@ -40,6 +41,7 @@ export default function ClaimDetail({ params }: { params: Promise<{ id: string }
           <Card title={`Scrub issues (${issues.length})`}>
             {issues.length ? <ul className="m-0 list-none space-y-2 p-0">{issues.map((i, k) => { const s = SEV[(i.severity as keyof typeof SEV)] ?? SEV.INFO; return <li key={k} className={`alert ${s.cls} m-0`}><s.icon /><span><b>{i.code}</b> {i.message}{i.lineRef && <span className="block text-xs opacity-80">Line: {i.lineRef}</span>}</span></li>; })}</ul>
               : <div className="alert ok m-0"><ShieldCheck />No issues. This claim is clean and ready to submit.</div>}
+            <div className="mt-3"><AiClaimRisk claimId={id} /></div>
           </Card>
           <Card title="Claim lines" flush><Table rows={c.lines ?? []} columns={[{ key: 'code', header: 'Code' }, { key: 'description', header: 'Description' }, { key: 'quantity', header: 'Qty' }, { key: 'amountMinor', header: 'Amount', render: (l: any) => money(l.amountMinor) }, { key: 'approvedMinor', header: 'Approved', render: (l: any) => money(l.approvedMinor) }]} /></Card>
         </div>

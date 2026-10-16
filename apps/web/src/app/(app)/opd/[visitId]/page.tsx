@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toast';
 import { PICK } from '@/lib/pickers';
 import { EntityPicker } from '@/components/EntityPicker';
 import { age, dateTime, fullName } from '@/lib/format';
+import { AiIcdSuggest, AiSoapDictation } from '@/components/AiDraft';
 
 const VITALS = [
   ['temperatureC', 'Temp (°C)'], ['pulse', 'Pulse (bpm)'], ['respRate', 'Resp rate'], ['systolic', 'BP systolic'], ['diastolic', 'BP diastolic'],
@@ -106,6 +107,7 @@ function SoapPanel({ visitId, existing }: { visitId: string; existing?: any }) {
   return (
     <Card title="Clinical note (SOAP)">
       <form onSubmit={handleSubmit((f) => { const body = { subjective: f.subjective || undefined, objective: f.objective || undefined, assessment: f.assessment || undefined, plan: f.plan || undefined }; m === update ? update.mutate(body) : create.mutate({ visitId, type: 'SOAP', ...body }); })} className="grid gap-3 md:grid-cols-2">
+        <AiSoapDictation visitId={visitId} onDraft={(d) => reset({ ...(existing ?? {}), ...d })} />
         {[['subjective', 'Subjective: history, presenting complaint'], ['objective', 'Objective: examination findings'], ['assessment', 'Assessment'], ['plan', 'Plan']].map(([k, l]) => <Field key={k} label={l}><textarea rows={5} className="input" {...register(k)} /></Field>)}
         <div className="flex justify-end md:col-span-2"><button className="btn primary" disabled={m.isPending}>{m.isPending ? <Spinner /> : <Save className="h-4 w-4" />}Save note</button></div>
       </form>
@@ -120,6 +122,8 @@ function DiagnosisPanel({ visitId }: { visitId: string }) {
   const add = useAction('post', '/emr/diagnoses', { invalidate: ['/emr/diagnoses', `/visits/${visitId}`], success: 'Diagnosis added' });
   const del = useAction<string>('del', (id) => `/emr/diagnoses/${id}`, { invalidate: ['/emr/diagnoses', `/visits/${visitId}`] });
   const items: any[] = Array.isArray(results.data) ? results.data : results.data?.data ?? [];
+  const visit = useGet<any>(`/visits/${visitId}`);
+  const noteText = (visit.data?.notes ?? []).map((n: any) => [n.subjective, n.objective, n.assessment, n.plan].filter(Boolean).join('\n')).join('\n');
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card title="ICD-11 search">
@@ -129,6 +133,7 @@ function DiagnosisPanel({ visitId }: { visitId: string }) {
           {items.map((d) => <li key={d.code} className="flex items-center justify-between gap-2 py-2 text-sm"><span><span className="font-mono text-xs text-brand dark:text-brand">{d.code}</span> {d.title}</span>
             <span className="flex gap-1"><button className="btn px-2 py-0.5 text-xs" onClick={() => add.mutate({ visitId, code: d.code, display: d.title, codeSystem: 'ICD-11', type: 'PRIMARY' })}>Primary</button><button className="btn px-2 py-0.5 text-xs" onClick={() => add.mutate({ visitId, code: d.code, display: d.title, codeSystem: 'ICD-11', type: 'SECONDARY' })}>Secondary</button></span></li>)}
         </ul>
+        <AiIcdSuggest visitId={visitId} noteText={noteText} onPick={(code, display, type) => add.mutate({ visitId, code, display, codeSystem: 'ICD-11', type })} />
       </Card>
       <Card title="Visit diagnoses">
         <Table rows={list.data?.data ?? []} columns={[{ key: 'code', header: 'Code' }, { key: 'display', header: 'Diagnosis' }, { key: 'type', header: 'Type', render: (d: any) => <StatusBadge status={d.type} /> }, { key: 'x', header: '', render: (d: any) => <button onClick={() => del.mutate(d.id)} aria-label="Remove"><Trash2 className="h-4 w-4 text-red-500" /></button> }]} />

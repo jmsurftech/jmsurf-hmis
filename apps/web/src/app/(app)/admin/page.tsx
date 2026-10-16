@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, Field, Loading, PageHeader, Spinner } from '@/components/ui';
 import { useAction, useGet } from '@/lib/hooks';
+import { AiSettingsCard } from '@/components/AiSettingsCard';
 
 /** Tenant settings: top-level tenant fields plus free-form `settings` JSON (address, receipts, integrations…). */
 export default function AdminSettings() {
@@ -38,6 +39,7 @@ export default function AdminSettings() {
           <Field label="eTIMS device serial"><input className="input" {...register('integrations.etimsSerial')} /></Field>
           <Field label="DHIS2 org unit"><input className="input" {...register('integrations.dhis2OrgUnit')} /></Field>
           <Field label="SMS sender ID"><input className="input" {...register('integrations.smsSenderId')} /></Field></div></Card>
+        <AiSettingsCard />
       </div>
     </form>
   );
