@@ -8,6 +8,7 @@ import { useGet, useList } from '@/lib/hooks';
 import { BOTTOM, NAV, type NavGroup, type NavItem } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
+import { OfflineIndicator } from './OfflineIndicator';
 import { CommandPalette } from './CommandPalette';
 import { Avatar, Loading } from './ui';
 
@@ -165,6 +166,7 @@ export function AppShell({ children, nav = NAV, home = '/dashboard', bottomNav =
           </div>
           <button className="cmdk-btn" onClick={() => setPalette(true)}><Search className="h-4 w-4" /><span>Search patients, pages and actions</span><kbd>Ctrl K</kbd></button>
           <button className="iconbtn search-sm" onClick={() => setPalette(true)} aria-label="Search"><Search className="h-4 w-4" /></button>
+          <OfflineIndicator />
           <FacilitySwitcher />
           <button className="iconbtn hide-sm" title="Refresh" aria-label="Refresh this page" onClick={() => setRefresh((r) => r + 1)}><RefreshCw className="h-4 w-4" /></button>
           <Notifications />

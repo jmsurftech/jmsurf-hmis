@@ -1,0 +1,19 @@
+{
+  "name": "JMSURF HMIS",
+  "short_name": "JMSURF",
+  "description": "Hospital management for Kenya & Africa. Works offline.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#bd2332",
+  "icons": [
+    { "src": "/hmis-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/hmis-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Queue", "url": "/queue" },
+    { "name": "Patients", "url": "/patients" },
+    { "name": "Patient portal", "url": "/portal/login" }
+  ]
+}

@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: { default: 'JMSURF HMIS', template: '%s · JMSURF HMIS' },
   description: 'Hospital management for Kenya and Africa: SHA claims, billing, EMR, lab, pharmacy, inpatient care and MOH reporting. Powered by JMSURF TECHNOLOGIES.',
   applicationName: 'JMSURF HMIS',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'JMSURF HMIS', statusBarStyle: 'default' },
 };
 export const viewport: Viewport = { themeColor: '#bd2332', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
