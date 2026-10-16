@@ -2,8 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { FiscalInvoicePort } from '../ports';
 import { EtimsAdapter } from '../ke/etims/etims.adapter';
 import { COUNTRY_PACKS } from '../country-packs';
-import { currentCountry } from './current-country';
-import { EbmAdapter, EfrisAdapter, EVatAdapter, FirsAdapter, NoopFiscalAdapter, VfdAdapter, ZraSmartInvoiceAdapter } from './fiscal-skeletons';
+import { IntegrationHttpService } from '../http-client';
+import { CountryResolver } from '../country-resolver';
+import { NoopFiscalAdapter } from './fiscal-skeletons';
+import { EfrisAdapter } from './efris';
+import { VfdAdapter } from './vfd';
+import { EBM_CONFIG, VsdcAdapter, ZRA_CONFIG } from './vsdc';
+import { EVatAdapter } from './evat';
+import { FirsAdapter } from './firs';
 
 /**
  * Fiscal invoice router, provided as FISCAL_INVOICE. Picks the adapter by tenant.countryCode
@@ -12,10 +18,10 @@ import { EbmAdapter, EfrisAdapter, EVatAdapter, FirsAdapter, NoopFiscalAdapter, 
 @Injectable()
 export class FiscalInvoiceFactory implements FiscalInvoicePort {
   private readonly adapters: Record<string, FiscalInvoicePort>;
-  constructor(etims: EtimsAdapter) {
+  constructor(etims: EtimsAdapter, http: IntegrationHttpService, private country: CountryResolver = new CountryResolver()) {
     this.adapters = {
-      etims, efris: new EfrisAdapter(), vfd: new VfdAdapter(), ebm: new EbmAdapter(), evat: new EVatAdapter(),
-      zra: new ZraSmartInvoiceAdapter(), firs: new FirsAdapter(), none: new NoopFiscalAdapter(),
+      etims, efris: new EfrisAdapter(http), vfd: new VfdAdapter(http), ebm: new VsdcAdapter(http, EBM_CONFIG), evat: new EVatAdapter(http),
+      zra: new VsdcAdapter(http, ZRA_CONFIG), firs: new FirsAdapter(http), none: new NoopFiscalAdapter(),
     };
   }
 
@@ -25,7 +31,7 @@ export class FiscalInvoiceFactory implements FiscalInvoicePort {
     return this.adapters[key] ?? this.adapters.none;
   }
 
-  signInvoice(args: Parameters<FiscalInvoicePort['signInvoice']>[0]) {
-    return this.forCountry(currentCountry()).signInvoice(args);
+  async signInvoice(args: Parameters<FiscalInvoicePort['signInvoice']>[0]) {
+    return this.forCountry(await this.country.current()).signInvoice(args);
   }
 }

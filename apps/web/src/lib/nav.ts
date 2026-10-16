@@ -2,6 +2,7 @@ import {
   Activity, BarChart3, Baby, BedDouble, Building2, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, Droplets, FileCheck2,
   FileText, FlaskConical, HeartPulse, Home, LayoutDashboard, ListOrdered, Package, Pill, Receipt, ScanLine, Scissors, Settings,
   ShieldAlert, ShoppingCart, Stethoscope, Users, Video, UserCog, Wallet, Landmark, Briefcase, PiggyBank, History, Tags, Handshake,
+  BellRing, HandCoins, MessageSquare, ShieldOff, Upload,
 } from 'lucide-react';
 import { REGISTERS } from './registers';
 
@@ -16,6 +17,8 @@ const BASE: NavGroup[] = [
     { href: '/patients', label: 'Patients', icon: Users, roles: ['RECEPTION', ...CLIN, 'CASHIER', 'CLAIMS_OFFICER'] },
     { href: '/queue', label: 'Queue', icon: ListOrdered, roles: ['RECEPTION', ...CLIN, 'LAB_TECH', 'PHARMACIST', 'CASHIER'] },
     { href: '/appointments', label: 'Appointments', icon: CalendarDays, roles: ['RECEPTION', ...CLIN] },
+    { href: '/messaging/templates', label: 'Message templates', icon: MessageSquare, roles: ['MANAGER', 'RECEPTION'] },
+    { href: '/messaging/reminders', label: 'Reminders log', icon: BellRing, roles: ['MANAGER', 'RECEPTION'] },
   ] },
   { label: 'Clinical', items: [
     { href: '/opd', label: 'Outpatient (OPD)', short: 'OPD', icon: Stethoscope, roles: CLIN },
@@ -41,6 +44,7 @@ const BASE: NavGroup[] = [
   ] },
   { label: 'Back office', items: [
     { href: '/finance', label: 'Finance', icon: Landmark, roles: ['ACCOUNTANT', 'MANAGER'] },
+    { href: '/finance/financing', label: 'Receivables financing', icon: HandCoins, roles: ['ACCOUNTANT', 'MANAGER'] },
     { href: '/hr', label: 'HR & Payroll', icon: Briefcase, roles: ['HR', 'MANAGER'] },
     { href: '/assets', label: 'Assets', icon: Building2, roles: ['ACCOUNTANT', 'MANAGER', 'STOREKEEPER'] },
     { href: '/budgets', label: 'Budgets', icon: PiggyBank, roles: ['ACCOUNTANT', 'MANAGER'] },
@@ -58,6 +62,8 @@ const BASE: NavGroup[] = [
     { href: '/admin/payers', label: 'Payers & schemes', icon: Handshake, roles: ['ADMIN'] },
     { href: '/admin/audit', label: 'Audit log', icon: History, roles: ['ADMIN'] },
     { href: '/admin/subscription', label: 'Subscription', icon: CreditCard, roles: ['ADMIN', 'ACCOUNTANT'] },
+    { href: '/admin/import', label: 'Import data (CSV)', icon: Upload, roles: ['ADMIN'] },
+    { href: '/admin/break-glass', label: 'Break-glass review', icon: ShieldOff, roles: ['ADMIN'] },
   ] },
 ];
 /** Sidebar order: core clinical first, then the register-based modules, then revenue and back office. */

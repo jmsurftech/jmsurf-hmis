@@ -50,6 +50,7 @@ export class IntegrationHttpService {
       if (done) return done.response as T;
     }
     const isForm = req.body instanceof URLSearchParams;
+    const isRaw = typeof req.body === 'string'; // pre-serialised XML/text bodies (e.g. TRA VFD)
     const logged = req.redact ? req.redact(req.body) : isForm ? Object.fromEntries(req.body as URLSearchParams) : req.body;
     const msg = await this.prisma.integrationMessage.create({
       data: {
@@ -66,12 +67,12 @@ export class IntegrationHttpService {
           method: req.method ?? 'POST',
           headers: {
             Accept: 'application/json',
-            ...(req.body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : {}),
+            ...(req.body !== undefined && !isForm && !isRaw ? { 'Content-Type': 'application/json' } : {}),
             ...(isForm ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
             ...(req.idempotencyKey ? { 'Idempotency-Key': req.idempotencyKey } : {}),
             ...req.headers,
           },
-          body: req.body === undefined ? undefined : isForm ? String(req.body) : JSON.stringify(req.body),
+          body: req.body === undefined ? undefined : isForm || isRaw ? String(req.body) : JSON.stringify(req.body),
           signal: AbortSignal.timeout(timeout),
         });
         const text = await res.text();
