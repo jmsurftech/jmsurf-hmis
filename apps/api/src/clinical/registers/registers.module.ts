@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
 import { Prisma } from '@prisma/client';
@@ -9,6 +9,8 @@ import { AuthUser, CurrentUser } from '../../common/auth-user';
 import { BillingCoreService } from '../../billing/billing-core.service';
 import { ListQuery, pageArgs, paged } from '../../revenue/list-query';
 import { REGISTERS } from './registers.catalog';
+import { applyRegisterRules, crossmatch } from './register-rules';
+import { NASCOP_COLUMNS, toCsv } from './rules/programmes.rules';
 
 class RecordQuery extends ListQuery {
   @IsOptional() @IsString() status?: string;
@@ -37,6 +39,47 @@ export class RegistersService {
     if (!d) throw new NotFoundException(`Unknown register '${module}'`);
     if (!u.isSuperAdmin && !u.roles.includes('ADMIN') && !u.roles.some((r) => d.roles.includes(r))) throw new ForbiddenException('Your role cannot use this register');
     return d;
+  }
+
+  /** Register rules (register-rules.ts) plus the crossmatch, which needs the blood-unit records. */
+  private async rules(u: AuthUser, module: string, status: string, data: Record<string, any>, createdAt?: Date) {
+    const r = applyRegisterRules(module, status, data, new Date(), createdAt);
+    const finalStatus = r.status ?? status;
+    let units: { id: string; number: string }[] = [];
+    if (module === 'transfusions' && ['CROSSMATCHED', 'ISSUED'].includes(finalStatus) && r.data.unitNumbers) {
+      const numbers = String(r.data.unitNumbers).split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+      const rows = await this.prisma.moduleRecord.findMany({ where: { tenantId: u.tenantId, module: 'blood-units', title: { in: numbers } } });
+      const missing = numbers.filter((n) => !rows.some((x) => x.title === n));
+      if (missing.length) r.errors.push(`Unknown blood unit(s): ${missing.join(', ')}`);
+      const xm = crossmatch(r.data.patientGroup, r.data.component, rows.map((x) => ({ number: x.title ?? x.number, status: x.status, data: (x.data ?? {}) as any })));
+      r.errors.push(...xm.errors);
+      r.data.crossmatch = { checkedAt: new Date().toISOString(), results: xm.results };
+      r.data.crossmatchResult = xm.results.map((x) => `${x.unit} (${x.group ?? '?'}): ${x.compatible ? 'compatible' : x.reason}`).join('; ') || null;
+      units = rows.map((x) => ({ id: x.id, number: x.title ?? x.number }));
+    }
+    if (r.errors.length) throw new BadRequestException(r.errors.join('. '));
+    return { data: r.data, status: finalStatus, units };
+  }
+
+  /** Crossmatched units are reserved; issued units leave stock. */
+  private async moveUnits(u: AuthUser, status: string, units: { id: string }[]) {
+    if (!units.length) return;
+    const to = status === 'ISSUED' ? 'ISSUED' : 'RESERVED';
+    await this.prisma.moduleRecord.updateMany({ where: { tenantId: u.tenantId, module: 'blood-units', id: { in: units.map((x) => x.id) }, status: { in: ['AVAILABLE', 'RESERVED'] } }, data: { status: to, updatedById: u.sub } });
+  }
+
+  /** NASCOP / KenyaEMR-style "current on ART" line list (indicative columns; see programmes.rules.ts). */
+  async nascopCsv(u: AuthUser) {
+    this.def(u, 'hiv');
+    const rows = await this.withPatients(u.tenantId, await this.prisma.moduleRecord.findMany({ where: { tenantId: u.tenantId, module: 'hiv' }, orderBy: { createdAt: 'asc' }, take: 20000 }));
+    return toCsv(NASCOP_COLUMNS, rows.map((r) => {
+      const d = (r.data ?? {}) as any; const p = r.patient as any;
+      return {
+        CCC_Number: r.title ?? r.number, Patient_MRN: p?.mrn, Sex: p?.sex, Date_of_Birth: p?.dateOfBirth, Enrollment_Date: d.enrolledOn, Entry_Point: d.entryPoint, WHO_Stage: d.whoStage,
+        ART_Start_Date: d.artStart, Current_Regimen: d.regimen, Regimen_Line: d.regimenLine, PMTCT: d.pmtct, Last_VL_Date: d.lastVlDate, Last_VL_Result: d.lastVl,
+        VL_Suppressed: d.vlSuppressed, Next_Appointment: d.nextRefill, Status: r.status,
+      };
+    }));
   }
 
   async summary(u: AuthUser, module: string) {
@@ -99,13 +142,15 @@ export class RegistersService {
     if (d.patient && !dto.patientId) throw new BadRequestException('Choose the patient');
     if (dto.status && !d.statuses.includes(dto.status)) throw new BadRequestException(`Status must be one of ${d.statuses.join(', ')}`);
     await this.checkLinks(u, dto);
+    const ruled = await this.rules(u, module, dto.status ?? d.statuses[0], dto.data ?? {});
     const number = await this.seq.next(u.tenantId, `REG-${module}`, d.prefix);
     const r = await this.prisma.moduleRecord.create({
       data: {
-        tenantId: u.tenantId, facilityId: u.facilityIds?.[0], module, number, title: dto.title?.trim() || null, status: dto.status ?? d.statuses[0],
-        patientId: dto.patientId || null, visitId: dto.visitId || null, data: (dto.data ?? {}) as Prisma.InputJsonValue, createdById: u.sub, updatedById: u.sub,
+        tenantId: u.tenantId, facilityId: u.facilityIds?.[0], module, number, title: dto.title?.trim() || null, status: ruled.status,
+        patientId: dto.patientId || null, visitId: dto.visitId || null, data: ruled.data as Prisma.InputJsonValue, createdById: u.sub, updatedById: u.sub,
       },
     });
+    await this.moveUnits(u, ruled.status, ruled.units);
     await this.audit.log({ tenantId: u.tenantId, userId: u.sub, action: 'CREATE', entity: 'ModuleRecord', entityId: r.id, data: { module, number, status: r.status } });
     return r;
   }
@@ -116,12 +161,13 @@ export class RegistersService {
     if (!cur) throw new NotFoundException('Record not found');
     if (dto.status && !d.statuses.includes(dto.status)) throw new BadRequestException(`Status must be one of ${d.statuses.join(', ')}`);
     await this.checkLinks(u, dto);
-    const data = dto.data ? ({ ...(cur.data as object), ...dto.data } as Prisma.InputJsonValue) : undefined;
+    const ruled = await this.rules(u, module, dto.status ?? cur.status, { ...(cur.data as object), ...(dto.data ?? {}) }, cur.createdAt);
     const r = await this.prisma.moduleRecord.update({
       where: { id },
-      data: { title: dto.title !== undefined ? dto.title.trim() || null : undefined, status: dto.status, patientId: dto.patientId, visitId: dto.visitId, data, updatedById: u.sub },
+      data: { title: dto.title !== undefined ? dto.title.trim() || null : undefined, status: ruled.status, patientId: dto.patientId, visitId: dto.visitId, data: ruled.data as Prisma.InputJsonValue, updatedById: u.sub },
     });
-    const changed = dto.status && dto.status !== cur.status ? { from: cur.status, to: dto.status } : undefined;
+    await this.moveUnits(u, ruled.status, ruled.units);
+    const changed = ruled.status !== cur.status ? { from: cur.status, to: ruled.status } : undefined;
     await this.audit.log({ tenantId: u.tenantId, userId: u.sub, action: changed ? 'STATUS' : 'UPDATE', entity: 'ModuleRecord', entityId: id, data: { module, ...(changed ?? {}), fields: dto.data ? Object.keys(dto.data) : [] } });
     return r;
   }
@@ -141,6 +187,8 @@ export class RegistersService {
 @Controller('records')
 export class RegistersController {
   constructor(private svc: RegistersService) {}
+  @Get('hiv/nascop.csv') @Header('Content-Type', 'text/csv') @Header('Content-Disposition', 'attachment; filename="nascop-line-list.csv"')
+  nascop(@CurrentUser() u: AuthUser) { return this.svc.nascopCsv(u); }
   @Get(':module/summary') summary(@CurrentUser() u: AuthUser, @Param('module') m: string) { return this.svc.summary(u, m); }
   @Get(':module') list(@CurrentUser() u: AuthUser, @Param('module') m: string, @Query() q: RecordQuery) { return this.svc.list(u, m, q); }
   @Get(':module/:id') get(@CurrentUser() u: AuthUser, @Param('module') m: string, @Param('id') id: string) { return this.svc.get(u, m, id); }

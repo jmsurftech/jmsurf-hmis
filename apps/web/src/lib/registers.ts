@@ -8,6 +8,8 @@ export interface RegField {
   name: string; label: string;
   type?: 'text' | 'number' | 'date' | 'datetime-local' | 'select' | 'textarea' | 'checkbox' | 'tel' | 'time' | 'staff';
   options?: string[]; required?: boolean; hint?: string; full?: boolean; unit?: string;
+  /** Calculated by the API register rules (apps/api/src/clinical/registers/register-rules.ts); shown, not edited. */
+  readOnly?: boolean;
 }
 export interface RegisterConfig {
   key: string; label: string; single: string; group: string; icon: React.ElementType; roles: string[];
@@ -70,13 +72,15 @@ export const REGISTERS: RegisterConfig[] = [
       { name: 'condition', label: 'Programme', type: 'select', options: ['Diabetes', 'Hypertension', 'Diabetes and hypertension', 'Asthma / COPD', 'Epilepsy', 'Sickle cell', 'Chronic kidney disease', 'Other'] },
       { name: 'enrolledOn', label: 'Enrolled on', type: 'date' }, { name: 'lastBp', label: 'Last BP', hint: 'For example 130/85' }, { name: 'lastHba1c', label: 'Last HbA1c', type: 'number', unit: '%' },
       { name: 'regimen', label: 'Current medication', type: 'textarea', full: true }, { name: 'nextAppointment', label: 'Next appointment', type: 'date' },
-    ], columns: ['condition', 'lastBp', 'nextAppointment'] },
+      { name: 'controlled', label: 'At target (BP <140/90, HbA1c <7%)', readOnly: true },
+    ], columns: ['condition', 'lastBp', 'controlled', 'nextAppointment'] },
   { key: 'oncology', label: 'Oncology', single: 'chemotherapy cycle', group: 'Specialty clinics', icon: Ribbon, roles: ['DOCTOR', 'CLINICAL_OFFICER', 'NURSE', 'PHARMACIST'], patient: true, visit: true,
     subtitle: 'Chemotherapy protocols, cycles and toxicity checks.', statuses: ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'HELD', 'CANCELLED'], active: ['PLANNED', 'IN_PROGRESS', 'HELD'], chargeCategory: 'PROCEDURE',
     titleLabel: 'Diagnosis', empty: 'Plan and record chemotherapy cycles.',
     fields: [
       { name: 'protocol', label: 'Protocol', hint: 'For example AC-T' }, { name: 'cycle', label: 'Cycle', type: 'number' }, { name: 'of', label: 'Of cycles', type: 'number' },
-      { name: 'dueOn', label: 'Due on', type: 'date' }, { name: 'bsa', label: 'Body surface area', type: 'number', unit: 'm²' },
+      { name: 'dueOn', label: 'Due on', type: 'date' }, { name: 'heightCm', label: 'Height', type: 'number', unit: 'cm' }, { name: 'weightKg', label: 'Weight', type: 'number', unit: 'kg' },
+      { name: 'bsa', label: 'Body surface area (Mosteller)', type: 'number', unit: 'm²', readOnly: true },
       { name: 'labsOk', label: 'Pre-chemo labs acceptable', type: 'select', options: YESNO }, { name: 'toxicity', label: 'Toxicity / side effects', type: 'textarea', full: true },
     ], columns: ['protocol', 'cycle', 'dueOn'] },
 
@@ -88,7 +92,8 @@ export const REGISTERS: RegisterConfig[] = [
       { name: 'enrolledOn', label: 'Enrolled on', type: 'date' }, { name: 'artStart', label: 'ART start', type: 'date' }, { name: 'regimen', label: 'Regimen', hint: 'For example TDF/3TC/DTG' },
       { name: 'lastVl', label: 'Last viral load', type: 'number', unit: 'copies/ml' }, { name: 'lastVlDate', label: 'Viral load date', type: 'date' },
       { name: 'pmtct', label: 'PMTCT', type: 'select', options: ['Not applicable', 'Pregnant', 'Breastfeeding'] }, { name: 'nextRefill', label: 'Next refill', type: 'date' },
-    ], columns: ['regimen', 'lastVl', 'nextRefill'] },
+      { name: 'vlSuppressed', label: 'Virally suppressed (<1000)', readOnly: true }, { name: 'vlCategory', label: 'Viral load category', readOnly: true }, { name: 'tracing', label: 'Refill tracing', readOnly: true },
+    ], columns: ['regimen', 'lastVl', 'vlSuppressed', 'nextRefill'] },
   { key: 'tb', label: 'TB register', single: 'TB case', group: 'Programmes', icon: Microscope, roles: CLIN, patient: true,
     subtitle: 'Case register, treatment phases and DOT.', statuses: ['ACTIVE', 'COMPLETED', 'CURED', 'FAILED', 'DEFAULTED', 'DECEASED'], active: ['ACTIVE'],
     titleLabel: 'TB number', empty: 'Register TB cases and follow treatment outcomes.',
@@ -97,6 +102,7 @@ export const REGISTERS: RegisterConfig[] = [
       { name: 'category', label: 'Category', type: 'select', options: ['New', 'Relapse', 'Treatment after failure', 'Treatment after loss to follow-up', 'Transfer in'] },
       { name: 'startedOn', label: 'Treatment start', type: 'date' }, { name: 'phase', label: 'Phase', type: 'select', options: ['Intensive', 'Continuation'] },
       { name: 'hivStatus', label: 'HIV status', type: 'select', options: ['Negative', 'Positive', 'Unknown'] }, { name: 'dotSupporter', label: 'DOT supporter' },
+      { name: 'treatmentEndsOn', label: 'Treatment ends (6 months)', type: 'date', readOnly: true },
     ], columns: ['type', 'phase', 'startedOn'] },
   { key: 'family-planning', label: 'Family planning', single: 'family planning client', group: 'Programmes', icon: HeartHandshake, roles: CLIN, patient: true,
     subtitle: 'Methods, refills and removals.', statuses: ['ACTIVE', 'DUE', 'CLOSED'], active: ['ACTIVE', 'DUE'],
@@ -127,7 +133,9 @@ export const REGISTERS: RegisterConfig[] = [
     fields: [
       { name: 'phone', label: 'Phone', type: 'tel' }, { name: 'idNumber', label: 'ID number' }, { name: 'bloodGroup', label: 'Blood group', type: 'select', options: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
       { name: 'lastDonation', label: 'Last donation', type: 'date' }, { name: 'hb', label: 'Haemoglobin', type: 'number', unit: 'g/dl' }, { name: 'deferralReason', label: 'Deferral reason' },
-    ], columns: ['bloodGroup', 'lastDonation', 'phone'] },
+      { name: 'sex', label: 'Sex', type: 'select', options: ['Male', 'Female'] }, { name: 'weightKg', label: 'Weight', type: 'number', unit: 'kg' },
+      { name: 'eligible', label: 'Eligible to donate', readOnly: true }, { name: 'nextEligibleOn', label: 'Next eligible on', type: 'date', readOnly: true }, { name: 'eligibilityNotes', label: 'Eligibility notes', readOnly: true, full: true },
+    ], columns: ['bloodGroup', 'eligible', 'lastDonation', 'phone'] },
   { key: 'blood-units', label: 'Blood units', single: 'blood unit', group: 'Blood bank', icon: Droplet, roles: ['LAB_TECH', 'DOCTOR', 'NURSE'],
     subtitle: 'Inventory of units by group, component and expiry.', statuses: ['QUARANTINE', 'AVAILABLE', 'RESERVED', 'ISSUED', 'EXPIRED', 'DISCARDED'], active: ['AVAILABLE'],
     titleLabel: 'Unit / bag number', empty: 'Add units as they are collected or received from the regional centre.',
@@ -145,6 +153,7 @@ export const REGISTERS: RegisterConfig[] = [
       { name: 'component', label: 'Component', type: 'select', options: ['Whole blood', 'Packed red cells', 'Platelets', 'Fresh frozen plasma', 'Cryoprecipitate'] },
       { name: 'units', label: 'Units', type: 'number' }, { name: 'unitNumbers', label: 'Unit numbers issued' }, { name: 'startedAt', label: 'Started', type: 'datetime-local' },
       { name: 'reaction', label: 'Reaction', type: 'select', options: ['None', 'Febrile', 'Allergic', 'Haemolytic', 'TACO', 'Other'] }, { name: 'notes', label: 'Notes', type: 'textarea', full: true },
+      { name: 'crossmatchResult', label: 'Crossmatch (ABO/Rh check)', readOnly: true, full: true, hint: 'Checked when the status moves to crossmatched or issued' },
     ], columns: ['component', 'units', 'reaction'] },
   { key: 'mortuary', label: 'Mortuary', single: 'body admission', group: 'Support services', icon: Skull, roles: ['NURSE', 'DOCTOR', 'MANAGER', 'CASHIER', 'RECEPTION'],
     subtitle: 'Body admission, storage, post-mortem and release.', statuses: ['ADMITTED', 'POST_MORTEM', 'READY', 'RELEASED'], active: ['ADMITTED', 'POST_MORTEM', 'READY'], chargeCategory: 'OTHER',
@@ -154,7 +163,8 @@ export const REGISTERS: RegisterConfig[] = [
       { name: 'source', label: 'Brought from', type: 'select', options: ['This facility (ward)', 'Brought in dead', 'Police case', 'Other facility'] }, { name: 'compartment', label: 'Compartment / tray' },
       { name: 'nextOfKin', label: 'Next of kin' }, { name: 'nokPhone', label: 'Next of kin phone', type: 'tel' }, { name: 'burialPermit', label: 'Burial permit number' },
       { name: 'releasedTo', label: 'Released to' }, { name: 'releasedOn', label: 'Released on', type: 'date' },
-    ], columns: ['dateOfDeath', 'compartment', 'nextOfKin'] },
+      { name: 'storageDays', label: 'Storage days', type: 'number', readOnly: true },
+    ], columns: ['dateOfDeath', 'compartment', 'storageDays', 'nextOfKin'] },
   { key: 'cssd', label: 'CSSD', single: 'instrument set', group: 'Support services', icon: Sparkles, roles: ['NURSE', 'STOREKEEPER', 'MANAGER'],
     subtitle: 'Instrument sets through washing, sterilisation and issue.', statuses: ['RECEIVED', 'WASHING', 'STERILISING', 'STERILE', 'ISSUED', 'FAILED'], active: ['RECEIVED', 'WASHING', 'STERILISING'],
     titleLabel: 'Set name', empty: 'Track each instrument set to the patient it was used on.',
@@ -168,7 +178,7 @@ export const REGISTERS: RegisterConfig[] = [
     fields: [
       { name: 'caller', label: 'Caller' }, { name: 'callerPhone', label: 'Caller phone', type: 'tel' }, { name: 'destination', label: 'Destination' },
       { name: 'vehicle', label: 'Vehicle registration' }, { name: 'crew', label: 'Crew' }, { name: 'priority', label: 'Priority', type: 'select', options: ['Emergency', 'Urgent', 'Routine transfer'] },
-      { name: 'kmOut', label: 'Odometer out', type: 'number' }, { name: 'kmIn', label: 'Odometer in', type: 'number' }, { name: 'handover', label: 'Hand-over notes', type: 'textarea', full: true },
+      { name: 'kmOut', label: 'Odometer out', type: 'number' }, { name: 'kmIn', label: 'Odometer in', type: 'number' }, { name: 'mileageKm', label: 'Trip distance', type: 'number', unit: 'km', readOnly: true }, { name: 'handover', label: 'Hand-over notes', type: 'textarea', full: true },
     ], columns: ['priority', 'vehicle', 'destination'] },
   { key: 'diet', label: 'Kitchen & diet', single: 'diet order', group: 'Support services', icon: Soup, roles: [...NURSE, 'MANAGER'], patient: true, visit: true,
     subtitle: 'Diet orders from the wards to the kitchen.', statuses: ['ORDERED', 'PREPARING', 'SERVED', 'CANCELLED'], active: ['ORDERED', 'PREPARING'],

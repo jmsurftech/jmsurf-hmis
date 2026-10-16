@@ -1,5 +1,5 @@
 'use client';
-import { History, Pencil, Plus, Printer, Receipt, Save } from 'lucide-react';
+import { Download, History, Pencil, Plus, Printer, Receipt, Save } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { use, useEffect, useMemo, useState } from 'react';
@@ -7,7 +7,7 @@ import { DataTable } from '@/components/DataTable';
 import { EntityPicker } from '@/components/EntityPicker';
 import { useToast } from '@/components/Toast';
 import { Card, Drawer, EmptyState, Field, humanize, KV, Modal, PageHeader, Spinner, StatCard, StatusBadge, statusTone } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, downloadCsv } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { date, dateTime, fullName } from '@/lib/format';
@@ -52,7 +52,8 @@ function Register({ cfg }: { cfg: RegisterConfig }) {
   return (
     <div>
       <PageHeader eyebrow={<span className="badge brand"><Icon className="h-3.5 w-3.5" />{cfg.group}</span>} title={cfg.label} subtitle={cfg.subtitle}
-        actions={<button className="btn primary" onClick={() => setCreating(true)}><Plus />New {cfg.single}</button>} />
+        actions={<>{cfg.key === 'hiv' && <button className="btn" onClick={() => downloadCsv('/records/hiv/nascop.csv', {}, 'nascop-line-list.csv')} title="KenyaEMR-style current-on-ART line list (indicative columns)"><Download />NASCOP line list</button>}
+          <button className="btn primary" onClick={() => setCreating(true)}><Plus />New {cfg.single}</button></>} />
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Open work" value={active} hint={cfg.active.map(humanize).join(', ')} icon={Icon} loading={summary.isLoading} />
         <StatCard label="This month" value={s?.thisMonth ?? 0} hint="Recorded since the 1st" icon={Plus} tone="blue" loading={summary.isLoading} />
@@ -103,7 +104,7 @@ function RecordForm({ cfg, record, onClose, onSaved }: { cfg: RegisterConfig; re
         {cfg.visit && patientId && <Field label="Visit" hint="Link a visit to bill services to it." className="sm:col-span-2"><EntityPicker source={{ path: '/visits', query: { patientId }, label: (v: any) => `${v.visitNumber} · ${humanize(v.type)}`, sub: (v: any) => `${dateTime(v.startedAt)} · ${humanize(v.status)}` }} value={visitId} onChange={setVisitId} placeholder="Choose a visit (optional)" /></Field>}
         <Field label={cfg.titleLabel ?? 'Title'}><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Enter ${(cfg.titleLabel ?? 'title').toLowerCase()}`} /></Field>
         <Field label="Status"><select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>{cfg.statuses.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}</select></Field>
-        {cfg.fields.map((f) => (
+        {cfg.fields.filter((f) => !f.readOnly).map((f) => (
           <Field key={f.name} label={`${f.label}${f.unit ? ` (${f.unit})` : ''}${f.required ? ' *' : ''}`} hint={f.hint} error={err[f.name]} className={f.full || f.type === 'textarea' ? 'sm:col-span-2' : ''}>
             {f.type === 'select' ? <select className="input" value={data[f.name] ?? ''} onChange={(e) => setData({ ...data, [f.name]: e.target.value })}><option value="">Choose {f.label.toLowerCase()}</option>{f.options?.map((o) => <option key={o} value={o}>{o}</option>)}</select>
               : f.type === 'textarea' ? <textarea className="input" rows={3} value={data[f.name] ?? ''} onChange={(e) => setData({ ...data, [f.name]: e.target.value })} placeholder={`Enter ${f.label.toLowerCase()}`} />
