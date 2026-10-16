@@ -1,3 +1,5 @@
+import { offlineFetch } from './offline';
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 const TOKEN_KEY = 'jmsurf.token';
 const FACILITY_KEY = 'jmsurf.facility';
@@ -9,11 +11,31 @@ export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) { super(message); }
 }
 
+const REFRESH_KEY = 'jmsurf.refresh';
 export const tokenStore = {
   get: () => (typeof window === 'undefined' ? null : localStorage.getItem(TOKEN_KEY)),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  getRefresh: () => (typeof window === 'undefined' ? null : localStorage.getItem(REFRESH_KEY)),
+  setRefresh: (t: string | null | undefined) => (t ? localStorage.setItem(REFRESH_KEY, t) : localStorage.removeItem(REFRESH_KEY)),
+  clear: () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
 };
+
+/** Single-flight refresh: concurrent 401s share one /auth/refresh call. Rotates both tokens. */
+let refreshing: Promise<boolean> | null = null;
+export function refreshSession(): Promise<boolean> {
+  const rt = tokenStore.getRefresh();
+  if (!rt) return Promise.resolve(false);
+  refreshing ??= fetch(`${API_URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: rt }) })
+    .then(async (r) => {
+      if (!r.ok) return false;
+      const b = await r.json();
+      tokenStore.set(b.accessToken); tokenStore.setRefresh(b.refreshToken);
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => { setTimeout(() => { refreshing = null; }, 0); });
+  return refreshing;
+}
 export const facilityStore = {
   get: () => (typeof window === 'undefined' ? null : localStorage.getItem(FACILITY_KEY)),
   set: (id: string) => localStorage.setItem(FACILITY_KEY, id),
@@ -29,16 +51,19 @@ export function qs(params?: Query): string {
   return str ? `?${str}` : '';
 }
 
-export async function apiFetch<T = unknown>(path: string, init: RequestInit & { query?: Query } = {}): Promise<T> {
-  const { query, ...rest } = init;
+export async function apiFetch<T = unknown>(path: string, init: RequestInit & { query?: Query; _retried?: boolean } = {}): Promise<T> {
+  const { query, _retried, ...rest } = init;
   const headers = new Headers(rest.headers);
   const token = tokenStore.get();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const fac = facilityStore.get();
   if (fac) headers.set('X-Facility-Id', fac);
   if (rest.body && !(rest.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const res = await fetch(`${API_URL}${path}${qs(query)}`, { ...rest, headers });
-  if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/login')) {
+  const res = await offlineFetch(`${path}${qs(query)}`, `${API_URL}${path}${qs(query)}`, { ...rest, headers });
+  if (res.status === 401 && typeof window !== 'undefined' && !_retried && !path.startsWith('/auth/') && (await refreshSession())) {
+    return apiFetch<T>(path, { ...init, _retried: true });
+  }
+  if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/login') && !path.startsWith('/auth/mfa') && !path.startsWith('/auth/change-password')) {
     tokenStore.clear();
     if (!window.location.pathname.startsWith('/login')) window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
     throw new ApiError(401, 'Session expired');

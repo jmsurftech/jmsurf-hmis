@@ -11,7 +11,7 @@ function ResetForm() {
   const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [done, setDone] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('');
-    if (pw.length < 8) return setErr('Use at least 8 characters.');
+    if (pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw) || !/[^A-Za-z0-9]/.test(pw)) return setErr('Use at least 10 characters with an uppercase letter, a lowercase letter, a digit and a symbol.');
     if (pw !== pw2) return setErr('The two passwords do not match.');
     const token = new URLSearchParams(window.location.search).get('token') ?? '';
     setBusy(true);
@@ -27,7 +27,7 @@ function ResetForm() {
         <Link href="/login" className="btn primary lg w-full">Sign in</Link>
       </> : <>
         <h1>Choose a new password</h1>
-        <p className="lead">Use at least 8 characters. Avoid passwords you use elsewhere.</p>
+        <p className="lead">Use at least 10 characters with upper and lower case letters, a digit and a symbol. Avoid passwords you use elsewhere.</p>
         {err && <div className="alert bad mb-4"><AlertTriangle />{err}</div>}
         <div className="flex flex-col gap-4">
           <Field label="New password"><PasswordInput autoComplete="new-password" placeholder="Enter a new password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>

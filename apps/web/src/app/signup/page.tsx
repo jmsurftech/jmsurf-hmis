@@ -22,7 +22,7 @@ const schema = z.object({
   lastName: z.string().trim().min(1, 'Enter your last name'),
   email: z.string().email('Enter a valid email address'),
   phone: z.string().optional(),
-  password: z.string().min(8, 'Use at least 8 characters'),
+  password: z.string().min(10, 'Use at least 10 characters').regex(/[a-z]/, 'Add a lowercase letter').regex(/[A-Z]/, 'Add an uppercase letter').regex(/\d/, 'Add a digit').regex(/[^A-Za-z0-9]/, 'Add a symbol'),
   confirm: z.string(),
   terms: z.literal(true, { errorMap: () => ({ message: 'Accept the terms to continue' }) }),
 }).refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'The passwords do not match' });
@@ -45,8 +45,8 @@ export default function Signup() {
   const submit = handleSubmit(async ({ confirm: _c, terms: _t, ...v }) => {
     setErr('');
     try {
-      const r = await api.post<{ accessToken: string; user: AuthUser }>('/auth/signup', { ...v, kmhflCode: v.kmhflCode || undefined, phone: v.phone || undefined });
-      setSession(r.accessToken, r.user); router.replace('/dashboard?welcome=1');
+      const r = await api.post<{ accessToken: string; refreshToken?: string; user: AuthUser }>('/auth/signup', { ...v, kmhflCode: v.kmhflCode || undefined, phone: v.phone || undefined });
+      setSession(r.accessToken, r.user, r.refreshToken); router.replace('/dashboard?welcome=1');
     } catch (e) { setErr((e as Error).message); }
   }, () => setErr('Some details need attention. Go back and check each step.'));
   const v = getValues(); const plan = watch('plan');
@@ -78,7 +78,7 @@ export default function Signup() {
             <Field label="Last name" error={errors.lastName?.message}><input className="input" autoComplete="family-name" placeholder="Enter your last name" {...register('lastName')} /></Field>
             <Field label="Work email" error={errors.email?.message} className="sm:col-span-2" hint="You will sign in with this."><input className="input" type="email" autoComplete="email" placeholder="Enter your email" {...register('email')} /></Field>
             <Field label="Phone" className="sm:col-span-2" hint="Optional. Include the country code."><input className="input" type="tel" autoComplete="tel" placeholder="Enter your phone number" {...register('phone')} /></Field>
-            <Field label="Password" error={errors.password?.message}><PasswordInput autoComplete="new-password" placeholder="At least 8 characters" {...register('password')} /></Field>
+            <Field label="Password" error={errors.password?.message}><PasswordInput autoComplete="new-password" placeholder="10+ characters, upper, lower, digit, symbol" {...register('password')} /></Field>
             <Field label="Confirm password" error={errors.confirm?.message}><PasswordInput autoComplete="new-password" placeholder="Enter it again" {...register('confirm')} /></Field>
           </div>}
           {step === 3 && <>

@@ -7,6 +7,7 @@ import { Avatar, Card, Field, PageHeader, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { TwoFactorCard } from '@/components/TwoFactorCard';
 import { humanize } from '@/components/ui';
 
 export default function Account() {
@@ -20,7 +21,7 @@ export default function Account() {
     try { await api.patch('/auth/me', p); toast.push('Profile saved', 'success'); setTimeout(() => window.location.reload(), 600); } catch (e) { toast.push((e as Error).message, 'error'); } finally { setSaving(false); }
   };
   const change = async () => {
-    if (pw.newPassword.length < 8) return toast.push('Use at least 8 characters for the new password', 'warn');
+    if (pw.newPassword.length < 10) return toast.push('Use at least 10 characters with upper and lower case letters, a digit and a symbol', 'warn');
     if (pw.newPassword !== pw.confirm) return toast.push('The new passwords do not match', 'warn');
     setChanging(true);
     try { await api.post('/auth/change-password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword }); toast.push('Password changed', 'success'); setPw({ currentPassword: '', newPassword: '', confirm: '' }); }
@@ -52,10 +53,11 @@ export default function Account() {
           <Card title={<span className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-brand" />Change password</span>} actions={<button className="btn primary sm" onClick={change} disabled={changing || !pw.currentPassword}>{changing ? <Spinner /> : <KeyRound />}Change</button>}>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Current password"><PasswordInput autoComplete="current-password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} placeholder="Enter your current password" /></Field>
-              <Field label="New password"><PasswordInput autoComplete="new-password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} placeholder="At least 8 characters" /></Field>
+              <Field label="New password"><PasswordInput autoComplete="new-password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} placeholder="10+ characters, mixed, with a symbol" /></Field>
               <Field label="Confirm new password"><PasswordInput autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} placeholder="Enter it again" /></Field>
             </div>
           </Card>
+          <TwoFactorCard />
         </div>
       </div>
     </div>

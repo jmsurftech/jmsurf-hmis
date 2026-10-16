@@ -5,6 +5,7 @@ import { use, useState } from 'react';
 import { Table } from '@/components/DataTable';
 import { FormDialog } from '@/components/FormDialog';
 import { OpenVisitDialog } from '@/components/OpenVisitDialog';
+import { BreakGlassButton, PatientPrivacyActions } from '@/components/Security';
 import { Card, ErrorNote, KV, Loading, PageHeader, StatusBadge, Tabs } from '@/components/ui';
 import { useGet, useList } from '@/lib/hooks';
 import { PICK } from '@/lib/pickers';
@@ -26,7 +27,7 @@ export default function PatientProfile({ params }: { params: Promise<{ id: strin
   return (
     <div>
       <PageHeader title={fullName(p)} subtitle={`${p.mrn} · ${p.sex} · ${age(p.dateOfBirth)} · ${p.phone ?? 'no phone'}`}
-        actions={<><Link href={`/appointments?patientId=${id}`} className="btn-secondary"><CalendarPlus className="h-4 w-4" />Book</Link><button className="btn-primary" onClick={() => setVisitOpen(true)}><Plus className="h-4 w-4" />Open visit</button></>} />
+        actions={<><BreakGlassButton patientId={id} /><PatientPrivacyActions patientId={id} mrn={p.mrn} /><Link href={`/appointments?patientId=${id}`} className="btn-secondary"><CalendarPlus className="h-4 w-4" />Book</Link><button className="btn-primary" onClick={() => setVisitOpen(true)}><Plus className="h-4 w-4" />Open visit</button></>} />
       {alg.length > 0 && <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300"><AlertTriangle className="h-4 w-4" />Allergies: {alg.map((a: any) => a.substance).join(', ')}</div>}
       <Tabs tabs={TABS} value={tab} onChange={setTab} />
       {tab === 'summary' && <div className="grid gap-4 lg:grid-cols-3">

@@ -7,6 +7,8 @@ export interface AuthUser {
   roles: string[];
   facilityIds: string[];
   isSuperAdmin: boolean;
+  /** Token purpose; only 'access' (or legacy untyped) tokens authenticate API calls. */
+  typ?: string;
 }
 
 /** Injects the authenticated user (JWT payload). tenantId is always taken from here, never from the request body. */
